@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<documento fecha_actualizacion="20241020192523">
+  <metadatos>
+    <identificador>BOE-A-2023-23637</identificador>
+    <origen_legislativo codigo="1">Estatal</origen_legislativo>
+    <departamento codigo="9279">Ministerio de Hacienda y Función Pública</departamento>
+    <rango codigo="1370">Resolución</rango>
+    <fecha_disposicion>20231116</fecha_disposicion>
+    <numero_oficial/>
+    <titulo>Resolución de 16 de noviembre de 2023, de la Secretaría de Estado de Función Pública, por la que se establece a efectos de cómputo de plazos, el calendario de días inhábiles en el ámbito de la Administración General del Estado para el año 2024.</titulo>
+    <diario codigo="BOE">Boletín Oficial del Estado</diario>
+    <fecha_publicacion>20231122</fecha_publicacion>
+    <diario_numero>279</diario_numero>
+    <seccion>1</seccion>
+    <subseccion/>
+    <pagina_inicial>155107</pagina_inicial>
+    <pagina_final>155109</pagina_final>
+    <suplemento_pagina_inicial/>
+    <suplemento_pagina_final/>
+    <url_pdf>/boe/dias/2023/11/22/pdfs/BOE-A-2023-23637.pdf</url_pdf>
+    <url_epub>/diario_boe/epub.php?id=BOE-A-2023-23637</url_epub>
+    <url_pdf_catalan/>
+    <url_pdf_euskera/>
+    <url_pdf_gallego/>
+    <url_pdf_valenciano/>
+    <estatus_legislativo>L</estatus_legislativo>
+    <fecha_vigencia/>
+    <estatus_derogacion>N</estatus_derogacion>
+    <fecha_derogacion/>
+    <judicialmente_anulada>N</judicialmente_anulada>
+    <fecha_anulacion/>
+    <vigencia_agotada>N</vigencia_agotada>
+    <estado_consolidacion codigo="0"/>
+    <letra_imagen>A</letra_imagen>
+    <suplemento_letra_imagen/>
+    <url_eli>https://www.boe.es/eli/es/res/2023/11/16/(1)</url_eli>
+  </metadatos>
+  <metadata-eli>
+    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:eli="http://data.europa.eu/eli/ontology#">
+      <eli:LegalResource rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)">
+        <eli:jurisdiction rdf:resource="http://www.elidata.es/mdr/authority/jurisdiction/1/es"/>
+        <eli:type_document rdf:resource="http://www.elidata.es/mdr/authority/resource-type/1/res"/>
+        <eli:id_local rdf:datatype="http://www.w3.org/2001/XMLSchema#string">BOE-A-2023-23637</eli:id_local>
+        <eli:date_document rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2023-11-16</eli:date_document>
+        <eli:number rdf:datatype="http://www.w3.org/2001/XMLSchema#string">(1)</eli:number>
+        <eli:has_member>
+          <eli:LegalResource rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof">
+            <eli:jurisdiction rdf:resource="http://www.elidata.es/mdr/authority/jurisdiction/1/es"/>
+            <eli:type_document rdf:resource="http://www.elidata.es/mdr/authority/resource-type/1/res"/>
+            <eli:id_local rdf:datatype="http://www.w3.org/2001/XMLSchema#string">BOE-A-2023-23637</eli:id_local>
+            <eli:date_document rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2023-11-16</eli:date_document>
+            <eli:number rdf:datatype="http://www.w3.org/2001/XMLSchema#string">(1)</eli:number>
+            <eli:version rdf:resource="http://www.elidata.es/mdr/authority/version/dof"/>
+            <eli:is_member_of rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)"/>
+            <eli:is_realized_by>
+              <eli:LegalExpression rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa">
+                <eli:language rdf:resource="http://www.elidata.es/mdr/authority/language/spa"/>
+                <eli:title rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Resolución de 16 de noviembre de 2023, de la Secretaría de Estado de Función Pública, por la que se establece a efectos de cómputo de plazos, el calendario de días inhábiles en el ámbito de la Administración General del Estado para el año 2024.</eli:title>
+                <eli:publisher_agent rdf:resource="https://www.boe.es"/>
+                <eli:date_publication rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2023-11-22</eli:date_publication>
+                <eli:realizes rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof"/>
+                <eli:is_embodied_by>
+                  <eli:Format rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa/epub">
+                    <eli:format rdf:resource="http://www.iana.org/assignments/media-types/application/epub+zip"/>
+                    <eli:embodies rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa"/>
+                  </eli:Format>
+                </eli:is_embodied_by>
+                <eli:is_embodied_by>
+                  <eli:Format rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa/html">
+                    <eli:format rdf:resource="http://www.iana.org/assignments/media-types/text/html"/>
+                    <eli:embodies rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa"/>
+                  </eli:Format>
+                </eli:is_embodied_by>
+                <eli:is_embodied_by>
+                  <eli:Format rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa/pdf">
+                    <eli:format rdf:resource="http://www.iana.org/assignments/media-types/application/pdf"/>
+                    <eli:embodies rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa"/>
+                  </eli:Format>
+                </eli:is_embodied_by>
+                <eli:is_embodied_by>
+                  <eli:Format rdf:about="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa/xml">
+                    <eli:format rdf:resource="http://www.iana.org/assignments/media-types/application/xml"/>
+                    <eli:embodies rdf:resource="https://www.boe.es/eli/es/res/2023/11/16/(1)/dof/spa"/>
+                  </eli:Format>
+                </eli:is_embodied_by>
+              </eli:LegalExpression>
+            </eli:is_realized_by>
+          </eli:LegalResource>
+        </eli:has_member>
+      </eli:LegalResource>
+    </rdf:RDF>
+  </metadata-eli>
+  <analisis>
+    <materias>
+      <materia codigo="82" orden="1">Administración General del Estado</materia>
+      <materia codigo="2499" orden="1">Días inhábiles</materia>
+      <materia codigo="5703" orden="1">Procedimiento administrativo</materia>
+    </materias>
+    <notas/>
+    <referencias>
+      <anteriores>
+        <anterior referencia="BOE-A-2015-10565" orden="3060">
+          <palabra codigo="440">DE CONFORMIDAD con</palabra>
+          <texto>el art. 30.7 de la Ley 39/2015, de 1 de octubre</texto>
+        </anterior>
+        <anterior referencia="BOE-A-2023-22014" orden="3070">
+          <palabra codigo="331">EN RELACIÓN con</palabra>
+          <texto>la Resolución de 23 de octubre de 2023</texto>
+        </anterior>
+      </anteriores>
+      <posteriores/>
+    </referencias>
+    <alertas>
+      <alerta codigo="109" orden="1">Derecho Administrativo</alerta>
+      <alerta codigo="121" orden="1">Organización de la Administración</alerta>
+    </alertas>
+  </analisis>
+  <texto>
+    <p class="parrafo">El artículo 30.7 de la Ley 39/2015, de 1 de octubre, del Procedimiento Administrativo Común de las Administraciones Públicas, establece que la Administración General del Estado fijará, en su ámbito, el calendario de días inhábiles a efectos de cómputo de plazos, con sujeción al calendario laboral oficial, que ha sido fijado en la Resolución de 23 de octubre de 2023, de la Dirección General de Trabajo, por la que se publica la relación de fiestas laborales para el año 2024 («Boletín Oficial del Estado» del 27 de octubre de 2023).</p>
+    <p class="parrafo">De acuerdo con el artículo 30.8 de la Ley 39/2015, de 1 de octubre, la declaración de un día como hábil o inhábil a efectos de cómputo de plazos no determina por sí sola el funcionamiento de los centros de trabajo de las Administraciones Públicas, la organización del tiempo de trabajo ni el acceso de los ciudadanos a los registros.</p>
+    <p class="parrafo">Este calendario de días inhábiles se publicará antes del comienzo de cada año en el «Boletín Oficial del Estado» y en otros medios de difusión que garanticen su conocimiento generalizado.</p>
+    <p class="parrafo">Por todo ello, esta Secretaría de Estado de Función Pública, órgano superior del Ministerio de Hacienda y Función Pública, en virtud del Real Decreto 682/2021, de 3 de agosto, por el que se desarrolla la estructura orgánica básica del Ministerio de Hacienda y Función Pública y se modifica el Real Decreto 139/2020, de 28 de enero, por el que se establece la estructura orgánica básica de los departamentos ministeriales, ha resuelto:</p>
+    <p class="articulo">Primero.</p>
+    <p class="parrafo">Aprobar el calendario de días inhábiles correspondiente al año 2024, para la Administración General del Estado y sus Organismos Públicos, a efectos de cómputo de plazos.</p>
+    <p class="articulo">Segundo.</p>
+    <p class="parrafo_2">Son días inhábiles:</p>
+    <p class="parrafo_2">a) En todo el territorio nacional: los sábados, los domingos y los días declarados como fiestas de ámbito nacional no sustituibles, o sobre las que la totalidad de las Comunidades Autónomas no han ejercido la facultad de sustitución.</p>
+    <p class="parrafo">b) En el ámbito territorial de las Comunidades Autónomas: aquellos días determinados por cada Comunidad Autónoma como festivos.</p>
+    <p class="parrafo">c) En los ámbitos territoriales de las Entidades que integran la Administración Local: los días que establezcan las respectivas Comunidades Autónomas en sus correspondientes calendarios de días inhábiles.</p>
+    <p class="parrafo_2">Los días inhábiles a que se refieren los puntos a) y b) de este apartado se recogen, especificados por meses y por Comunidades Autónomas, en el anexo adjunto.</p>
+    <p class="articulo">Tercero.</p>
+    <p class="parrafo">Disponer la publicación de la presente resolución en el «Boletín Oficial del Estado», que también estará disponible en el Punto de Acceso General Electrónico (administracion.gob.es) de la Administración General del Estado.</p>
+    <p class="parrafo_2">Madrid, 16 de noviembre de 2023.–La Secretaría de Estado de Función Pública, Lidia Sánchez Milán.</p>
+    <p class="anexo_num">ANEXO</p>
+    <p class="anexo_tit">Calendario de días inhábiles, 2024</p>
+    <p class="parrafo_2">Enero: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 1: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo_2">Febrero: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 13: Inhábil en la Comunidad Autónoma de Extremadura.</p>
+    <p class="parrafo">Día 28: Inhábil en la Comunidad Autónoma de Andalucía.</p>
+    <p class="parrafo_2">Marzo: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 1: Inhábil en la Comunidad Autónoma de Illes Balears.</p>
+    <p class="parrafo">Día 19: Inhábil en la Región de Murcia, así como en la Comunitat Valenciana.</p>
+    <p class="parrafo">Día 28: Inhábil en las Comunidades Autónomas de Andalucía, de Aragón, del Principado de Asturias, de las Illes Balears, de Canarias, de Cantabria, de Castilla-La Mancha, de Extremadura, de Galicia, de la Región de Murcia, del País Vasco, de La Rioja, así como en la Comunidad de Castilla y León, en la Comunidad de Madrid, en la Comunidad Foral de Navarra, en la Ciudad de Ceuta y en la Ciudad de Melilla.</p>
+    <p class="parrafo">Día 29: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo_2">Abril: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 1: Inhábil en las Comunidades Autónomas de las Illes Balears, de Cantabria, de Cataluña, del País Vasco, de La Rioja, así como de la Comunidad Foral de Navarra y de la Comunitat Valenciana.</p>
+    <p class="parrafo">Día 23: Inhábil en la Comunidad Autónoma de Aragón, así como en la Comunidad de Castilla y León.</p>
+    <p class="parrafo_2">Mayo: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 1: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo">Día 2: Inhábil en la Comunidad de Madrid.</p>
+    <p class="parrafo">Día 17: Inhábil en la Comunidad Autónoma de Galicia.</p>
+    <p class="parrafo">Día 30: Inhábil en las Comunidades Autónomas de Canarias y de Castilla-La Mancha.</p>
+    <p class="parrafo">Día 31: Inhábil en la Comunidad Autónoma de Castilla-La Mancha.</p>
+    <p class="parrafo_2">Junio: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 10: Inhábil en la Comunidad Autónoma de La Rioja.</p>
+    <p class="parrafo">Día 17: Inhábil en la Ciudad de Ceuta y en la Ciudad de Melilla.</p>
+    <p class="parrafo">Día 24: Inhábil en la Comunidad Autónoma de Cataluña, así como en la Comunitat Valenciana.</p>
+    <p class="parrafo_2">Julio: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 25: Inhábil en las Comunidades Autónomas de Cantabria, de Galicia y del País Vasco, así como en la Comunidad de Madrid y en la Comunidad Foral de Navarra.</p>
+    <p class="parrafo_2">Agosto: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 5: Inhábil en la Ciudad de Ceuta.</p>
+    <p class="parrafo">Día 15: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo_2">Septiembre: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 9: Inhábil en la Comunidad Autónoma del Principado de Asturias.</p>
+    <p class="parrafo">Día 11: Inhábil en la Comunidad Autónoma de Cataluña.</p>
+    <p class="parrafo_2">Octubre: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 9: Inhábil en la Comunitat Valenciana</p>
+    <p class="parrafo_2">Noviembre: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 1: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo_2">Diciembre: Todos los sábados y domingos del mes.</p>
+    <p class="parrafo_2">Día 6: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo">Día 9: Inhábil en las Comunidades Autónomas de Andalucía, de Aragón, del Principado de Asturias, de Extremadura, de la Región de Murcia, así como en la Comunidad de Castilla y León y en la Ciudad de Melilla.</p>
+    <p class="parrafo">Día 25: Inhábil en todo el territorio nacional.</p>
+    <p class="parrafo">Día 26: Inhábil en la Comunidad Autónoma de Cataluña.</p>
+    <p class="parrafo_2">1. En la Comunidad Autónoma de Canarias, el Decreto 363/2023, de 11 de septiembre, por el que se determina el calendario de fiestas laborales de la Comunidad Autónoma de Canarias para el año 2024, y se abre plazo para fijar las fiestas locales (BOC de 18 de septiembre de 2023) dispone que: «En las islas de El Hierro, Fuerteventura, Gran Canaria, La Gomera, La Palma, Lanzarote, La Graciosa y Tenerife, las fiestas laborales serán, además, las siguientes: en El Hierro: el 24 de septiembre, festividad de Nuestra Señora de los Reyes; en Fuerteventura: el 20 de septiembre, festividad de Nuestra Señora de la Peña; en Gran Canaria: el 9 de septiembre, lunes posterior a la festividad de Nuestra Señora del Pino; en La Gomera: el 7 de octubre, festividad de Nuestra Señora de Guadalupe; en La Palma: el 5 de agosto, festividad de Nuestra Señora de Las Nieves; en Lanzarote y La Graciosa: el 16 de septiembre, festividad de Nuestra Señora de los Volcanes; en Tenerife: el 2 de febrero, festividad de la Virgen de la Candelaria».</p>
+    <p class="parrafo">2. En la Comunidad Autónoma de Cataluña, la Orden EMT/153/2023, de 29 de mayo, por la que se establece el calendario oficial de fiestas laborales en Cataluña para el año 2024 (DOGC de 13 de junio de 2023) dispone que: «En el territorio de Arán, la fiesta del día 26 de diciembre (San Esteban) queda sustituida por la de 17 de junio (Fiesta de Arán), lunes». Asimismo, dispone que: «De las trece fiestas mencionadas en el apartado a) [las transcritas en el cuadro precedente] habrá una, a escoger entre el 6 de enero, el 1 de abril, el 24 de junio y el 26 de diciembre, que tendrá el carácter, de recuperable. Las otras doce serán de carácter retribuido y no recuperable».</p>
+    <p class="parrafo">3. En la Comunitat Valenciana, el Decreto 164/2023, de 29 de septiembre, del Consell, por el que se determina el calendario laboral de aplicación en el ámbito territorial de la Comunitat Valenciana para el año 2024 (DOGV de 4 de octubre de 2023) dispone que: «[…] Con carácter retribuido y recuperable se establece la siguiente fiesta: 24 de junio, San Juan».</p>
+  </texto>
+</documento>
