@@ -198,8 +198,9 @@ def in_period(l, val) :
 # such as the table for the energy and for the power.
 timeframe = (dt.datetime(2024, 8, 31, 23, 59), dt.datetime(2024, 9, 30, 23, 59))
 
-def define_time(timeframe, period_hours) : 
+def define_time(timeframe, period_hours, full_date = full_date) : 
     Time = [[] for k in range(6)]
+    Time_in_month = [set() for k in range(12)]
     P = 0
     for k in range(len(full_date)) : 
         date = full_date[k]    
@@ -214,11 +215,12 @@ def define_time(timeframe, period_hours) :
                     j += 1
                 P = j
             Time[P].append(k)
+            Time_in_month[date.month - 1].add(k)
     delta = timeframe[1] - timeframe[0]
     Nbdays = delta.days
-    return Time, Nbdays
+    return Time, Nbdays, Time_in_month
 
-Time, Nbdays = define_time(timeframe, period_hours)
+Time, Nbdays, _ = define_time(timeframe, period_hours)
 
         
 #%% Compute    
@@ -239,3 +241,51 @@ result2 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, 
 # Just to see the total of energy in each period.
 # TE = [1, 1, 1, 1, 1, 1]
 result3 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
+
+#%% utils
+
+def last_day(any_day):
+    next_month = any_day.replace(day=28) + dt.timedelta(days=4)
+    if any_day.month == 11 :
+        return dt.datetime(2024, 11, 20, 23, 59)
+    return (next_month - dt.timedelta(days=next_month.day)).replace(hour=23, minute = 59)
+
+def search_dico(l, val, deb_or_fin = 'deb') : 
+    deb = 0
+    fin = len(l) - 1
+    while fin - deb > 1 : 
+        mid = (deb + fin)//2
+        if l[mid] == val : 
+            return mid 
+        elif l[mid] > val : 
+            fin = mid
+        else : 
+            deb = mid
+    # If we want to stop the fist inferior or equal values we put 'deb' otherwise we put 'fin' (superior or equal)
+    if deb_or_fin == 'deb' : 
+        return deb
+    else :
+        return fin
+    
+    
+def define_time(timeframe, period_hours, full_date = full_date) : 
+    Time = [[] for k in range(6)]
+    Time_in_month = [set() for k in range(12)]
+    P = 0
+    for k in range(len(full_date)) : 
+        date = full_date[k]    
+        if date >= timeframe[0] and date <= timeframe[1] : 
+            if date.weekday() >= 5 or date in None_working_days : 
+                P = 5
+            else : 
+                month = date.month
+                time = date.hour + date.minute/60
+                j = 0
+                while not period_hours[month-1][j] or not in_period(period_hours[month-1][j], time) : 
+                    j += 1
+                P = j
+            Time[P].append(k)
+            Time_in_month[date.month - 1].add(k)
+    delta = timeframe[1] - timeframe[0]
+    Nbdays = delta.days
+    return Time, Nbdays, Time_in_month
