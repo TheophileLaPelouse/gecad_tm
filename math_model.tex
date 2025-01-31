@@ -1,0 +1,102 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\begin{document}
+
+\section*{Mathematical Formulation of the Model}
+
+\subsection*{Sets}
+\begin{itemize}
+    \item \( \text{period} \): Set of periods \( p \)
+    \item \( \text{month} \): Set of months \( m \)
+    \item \( \text{time} \): Set of time steps \( t \)
+\end{itemize}
+
+\subsection*{Parameters}
+\begin{itemize}
+    \item \( E_{\text{cons}}[t] \): Energy consumption at time \( t \)
+    \item \( E_{\text{prod}}[t] \): Produced energy at time \( t \)
+    \item \( TP[p] \): Power tariff for period \( p \) for the entire year
+    \item \( TE[m][p] \): Energy tariff for month \( m \) and period \( p \)
+    \item \( Time[p] \): Time steps in period \( p \)
+    \item \( \text{tep} \): Penalization tarriff coefficient 
+    \item \( Kp[p] \): Penalty coefficient for period \( p \)
+    \item \( \Delta t \): Time step duration
+    \item \( TB \): Battery tariff depending on the capacity
+    \item \( TB_{maintenance} \): Tariff for the maintenance of the batterie per year
+    \item \( N_{days} \): Number of day for the optimization
+    \item \( Effc \): Efficiency for charging the batterie
+    \item \( Effd \): Efficiency for discharging the batterie
+\end{itemize}
+
+\subsection*{Variables}
+\begin{itemize}
+    \item \( P_{\text{prev}}[p] \): Power contracted for the year \( p \)
+    \item \( P_c[t] \): Charging power at time \( t \)
+    \item \( P_d[t] \): Discharging power at time \( t \)
+    \item \( E[t] \): Energy stored in the battery at time \( t \)
+    \item \( C_b \): Capacity of the batterie
+    \item \( E_{\text{grid+}}[t] \): Energy consumed from the grid at time \( t \)
+    \item \( E_{\text{grid-}}[t] \): Energy injected into the grid at time \( t \)
+    \item \( P_{\text{+}}[t, p] \): Positive power difference between the consumed power and the contracted one at time \( t \) and period \( p \)
+    \item \( P_{\text{-}}[t, p] \): Negative power difference between the consumed power and the contracted one at time at time \( t \) and period \( p \)
+\end{itemize}
+
+\subsection*{Objective Function}
+Minimize the total cost:
+
+The total cost is composed of the cost for the contracted power, the cost of the electricity energy from the grid, the cost of the penalisation and the battery cost.
+
+\[
+\begin{aligned}
+    \text{Minimize} \quad & \sum_{p} TP[p] \cdot P_{\text{prev}}[p] \cdot N_{\text{days}} \\
+    & + \sum_{m, p, t} TE[m][p] \cdot E_{\text{grid+}}[t] \\
+    & + \sum_{p} Kp[p] \cdot \text{tep} \cdot \sqrt{\sum_{t} (P_{\text{plus}}[t, p])^2} \\
+    & + \left( \frac{C_b \cdot TB}{batterie\ lifetime} + C_b \cdot TB_{maintenance} \right) \cdot \frac{N_{\text{days}}}{365}
+\end{aligned}
+\]
+
+\subsection*{Constraints}
+\begin{enumerate}
+    \item \textbf{Battery Capacity Constraints:}
+    \[
+    \begin{aligned}
+        & E[t] \leq C_b \\
+        & E[t] \geq 0.2 \cdot C_b
+    \end{aligned}
+    \]
+
+    \item \textbf{Battery Power Constraints:}
+    \[
+    \begin{aligned}
+        & P_c[t] \leq \text{charge\_rate} \cdot C_b \\
+        & P_d[t] \leq \text{decharge\_rate} \cdot C_b
+    \end{aligned}
+    \]
+
+    \item \textbf{Battery Energy Balance:}
+    \[
+    E[t] = E[t-1] + (\text{Effc} \cdot P_c[t] - \frac{P_d[t]}{\text{Effd}}) \cdot \Delta t
+    \]
+
+    \item \textbf{Grid Energy Balance:}
+    \[
+    E_{\text{grid+}}[t] - E_{\text{grid-}}[t] = E_{\text{cons}}[t] + (P_c[t] - P_d[t]) \cdot \Delta t - E_{\text{prod}}[t]
+    \]
+
+    \item \textbf{Power difference for penalization:}
+    \[
+    P_{\text{plus}}[t, p] - P_{\text{minus}}[t, p] = \frac{E_{\text{cons}}[t] - E_{\text{prod}}[t]}{\Delta t} + (P_c[t] - P_d[t]) - P_{\text{prev}}[p]
+    \]
+
+    \item \textbf{Power contracted constraint:}
+    \[
+    \begin{aligned}
+        & P_{\text{prev}}[p] \leq P_{\text{prev}}[p+1] \\
+        & P_{\text{prev}}[0] \geq 0
+    \end{aligned}
+    \]
+\end{enumerate}
+
+\end{document}

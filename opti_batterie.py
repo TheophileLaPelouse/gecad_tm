@@ -8,7 +8,11 @@ import os
 import matplotlib.pyplot as plt
 
 #%%
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+from representative_days import Econs_new, Eprod_new, full_date_new, days
+
+Pcons_new = [val/0.25 for val in Econs_new]
+Pprod_new = [val/0.25 for val in Eprod_new]
 
 Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
@@ -33,7 +37,6 @@ TE = [
 charge_rate = 0.5 
 Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen the losses if come from PV ? Maybe
 Effd = 0.95 # order of magnitude, need to be looked into.
-
 
 #%% Model construction
 def calculate_price(model, Pprev, deltat, Egrid_plus, Egrid_minus, Pplus, Pminus, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
@@ -65,17 +68,24 @@ def calculate_price(model, Pprev, deltat, Egrid_plus, Egrid_minus, Pplus, Pminus
     return Se + Seauto + Spena + Sp
 
 def battery_price(Cb, nbdays) :
-    return 100*Cb/(365*10)*nbdays
+    # investment = 359 $/kwh/year, maintenance = 0.019$/kwh/year, lifetime = 9 years
+    return (Cb*359/9+Cb*0.019)*nbdays/365
     # return 0
 
 timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
 
-def build_model(timeframe, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95) :
+def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
 
-    Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
-    Nbdays += 1
-    timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+    if definer == 1 :
+        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+        Nbdays += 1
+        timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+    elif definer == 2 :
+        Time, Nbdays, Time_in_month = define_time2(timeframe, period_hours)
+        timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+    else : 
+        raise ValueError("definer must be 1 or 2")
     
     model = pyo.ConcreteModel()
     
@@ -88,7 +98,7 @@ def build_model(timeframe, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0
     # Battery
     model.Pc = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
-    model.E = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
+    model.E = pyo.Var(model.time, domain=pyo.NonNegativeReals)
     model.Cb = pyo.Var(domain = pyo.NonNegativeReals)
     
     # For it to be linear
@@ -133,7 +143,7 @@ def build_model(timeframe, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0
         if t == model.time.first() : 
             return model.E[t] == (0.2*model.Cb + model.Cb)/2
             # return model.E[t] == 5
-        return model.E[t] == model.E[t-1] + (Effc*model.Pc[t] - model.Pd[t]*Effd)*model.deltat
+        return model.E[t] == model.E[t-1] + (Effc*model.Pc[t] - model.Pd[t]/Effd)*model.deltat
     model.battery_con = pyo.Constraint(model.time, rule=battery_rule)
     
     def Egrid_rule(model, t) : 
@@ -173,7 +183,8 @@ def solve(model, print_level = 7) :
 # model.display()
 
 #%% Plot batterie usage 
-model = build_model(timeframe)
+# model = build_model(timeframe)
+model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
 solver, results = solve(model)
 
 real_time = [full_date[k] for k in model.time]

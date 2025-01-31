@@ -25,6 +25,7 @@ months = range(1, 12) # No december for the moment
 
 # For each month, we will take 3 representative days, one that represents the mediane in term of power output 
 # One that represents the day with the highest power output and one that represents the day with the lowest power output.
+# Warning, maybe we should add some representative days specifically in the none working days.
 
 def create_index(day, full_date) : 
     return range(search_dico(full_date, day, 'fin'), search_dico(full_date, day + dt.timedelta(hours = 23, minutes = 59), 'debut')+1)
@@ -123,7 +124,7 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
         else :
             Days[args[2]] = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'sum_Econs_Eprod' : 0, 'frac' : 1, 'day' : None, 'cond' : cond}
             if args[1] in ['<', '<='] : 
-                Days[args[2]]['sum_Econs_Eprod'] = 1000000000
+                Days[args[2]]['sum_Econs_Eprod'] = 1000000000 # We can add some zero if needed
                 Days[args[2]]['sum_Econs'] = 1000000000
                 Days[args[2]]['sum_Eprod'] = 1000000000
     
@@ -169,7 +170,7 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
         for key in Days.keys() :
             if not key.replace('.', '').isnumeric() : # Not the fractions
                 args = Days[key]['cond'].split(' ')
-                print(args[0] + args[1] + 'Days[key]["%s"]' % args[0])
+                # print(args[0] + args[1] + 'Days[key]["%s"]' % args[0])
                 # print(eval(args[0]), eval(args[1]), eval(args[2]))
                 if eval(args[0] + args[1] + 'Days[key]["%s"]' % args[0]) : 
                     Days[key]['sum_Econs'] = sum_Econs
@@ -186,22 +187,42 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
     
     for frac in list_frac : 
         med = int(len(Ecp_month)*frac)
-        index = create_index(days[med], full_date)
+        # index = create_index(days[med], full_date)[:-1]
+        print(days[med])
+        print(index)
+        print()
         Days[str(frac)]['sum_Econs'] = Econs_month[med]
         Days[str(frac)]['sum_Eprod'] = Eprod_month[med]
         Days[str(frac)]['sum_Econs_Eprod'] = Ecp_month[med]
         Days[str(frac)]['day'] = days[med]
-        Days[str(frac)]['Econs'] = [Econs[k] for k in index]
-        Days[str(frac)]['Eprod'] = [Eprod[k] for k in index]
+        # Days[str(frac)]['Econs'] = [Econs[k] for k in index]
+        # Days[str(frac)]['Eprod'] = [Eprod[k] for k in index]
     
     for key in Days :
-        print(Days[key])
-        index = create_index(Days[key]['day'], full_date)
+        # print(Days[key])
+        index = create_index(Days[key]['day'], full_date)[:-1]
         Days[key]['Econs'] = [Econs[k] for k in index]
         Days[key]['Eprod'] = [Eprod[k] for k in index]
         
     return Days, during_day_stat_values
     
+    
+#%% Create the days 
+
+Econs_new = []
+Eprod_new = []
+full_date_new = []
+days = []
+for m in months :
+    Days, _ = select_days2(m, TE, Econs, Eprod, period_hours, full_date, [], [0.05, 0.25, 0.5, 0.75, 0.95])
+    for key in Days :
+        Econs_new += Days[key]['Econs']
+        Eprod_new += Days[key]['Eprod']
+        full_date_new += [full_date[k] for k in create_index(Days[key]['day'], full_date)[:-1]]
+        days.append(Days[key]['day']) # For verification sake
+
+#%%
+
 if __name__ == '__main__' : 
     import matplotlib.pyplot as plt
     # mediane_day, max_day, min_day, during_day_stat_values = select_days(1, TE[0], Econs, Eprod, period_hours, full_date)
@@ -221,21 +242,57 @@ if __name__ == '__main__' :
     # ax3.plot(min_day['Eprod'], label='Eprod')
     # ax3.legend()
     
-    conds = ['sum_Econs > max_cons', 'sum_Econs < min_cons', 'sum_Eprod > max_prod', 'sum_Eprod < min_prod', 'sum_Econs_Eprod > max_Econs_Eprod', 'sum_Econs_Eprod < min_Econs_Eprod']
-    frac = [1/4, 1/2,3/4, 9/10]
-    Days, during_day_stat_values = select_days2(4, TE[0], Econs, Eprod, period_hours, full_date, conds, frac, during_day_stat = None)
+    # conds = ['sum_Econs > max_cons', 'sum_Econs < min_cons', 'sum_Eprod > max_prod', 'sum_Eprod < min_prod', 'sum_Econs_Eprod > max_Econs_Eprod', 'sum_Econs_Eprod < min_Econs_Eprod']
+    # frac = [1/4, 1/2,3/4, 9/10]
+    # Days, during_day_stat_values = select_days2(4, TE[0], Econs, Eprod, period_hours, full_date, conds, frac, during_day_stat = None)
     
-    plts = []
-    for key in Days : 
-        fig, ax = plt.subplots()
-        ax.plot(Days[key]['Econs'], label='Econs')
-        ax.plot(Days[key]['Eprod'], label='Eprod')
-        Days[key]['Econs_Eprod'] = [Days[key]['Econs'][k] - Days[key]['Eprod'][k] for k in range(len(Days[key]['Eprod']))]
-        ax.plot(Days[key]['Econs_Eprod'], label='Econs - Eprod')
-        ax.legend()
-        ax.set_title(key)
-        plts.append(fig)
-        plts.append((fig, ax))
+    # plts = []
+    # for key in Days : 
+    #     fig, ax = plt.subplots()
+    #     ax.plot(Days[key]['Econs'], label='Econs')
+    #     ax.plot(Days[key]['Eprod'], label='Eprod')
+    #     Days[key]['Econs_Eprod'] = [Days[key]['Econs'][k] - Days[key]['Eprod'][k] for k in range(len(Days[key]['Eprod']))]
+    #     ax.plot(Days[key]['Econs_Eprod'], label='Econs - Eprod')
+    #     ax.legend()
+    #     ax.set_title(key)
+    #     plts.append(fig)
+    #     plts.append((fig, ax))
     
-    plt.show()
+    # plt.show()
     
+    # Verify if the days created have the good indices
+    
+    flag = True 
+    i0 = 0
+    for d in days : 
+        index = create_index(d, full_date)[:-1]
+        Econs_day = [Econs[k] for k in index]
+        Eprod_day = [Eprod[k] for k in index]
+        full_date_day = [full_date[k] for k in index]
+        
+        # index_new = create_index(d, full_date_new) This array is not sorted so it does not work at all
+        i1 = i0
+        n = len(full_date_new)
+        while i1 <n and full_date_new[i1].date() == full_date_new[i0].date() : 
+            i1+=1
+        index_new = range(i0, i1)
+        i0 = i1
+        Econs_day_new = [Econs_new[k] for k in index_new]
+        Eprod_day_new = [Eprod_new[k] for k in index_new]
+        full_date_day_new = [full_date_new[k] for k in index_new]
+        
+        flag_econs = Econs_day_new == Econs_day
+        flag_eprod = Eprod_day_new == Eprod_day
+        flag_date = full_date_day_new == full_date_day
+        
+        if not (flag_econs and flag_eprod and flag_date):
+            print(d, 'Pas bon du tout tout ça')
+            if not flag_econs:
+                print('Econs mismatch')
+            if not flag_eprod:
+                print('Eprod mismatch')
+            if not flag_date:
+                print('Date mismatch')
+            break
+        
+    print("YOUPI")

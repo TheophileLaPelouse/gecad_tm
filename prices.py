@@ -268,24 +268,24 @@ def search_dico(l, val, deb_or_fin = 'deb') :
         return fin
     
     
-def define_time(timeframe, period_hours, full_date = full_date) : 
+def define_time2(days, period_hours, full_date=full_date) : 
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
-    for k in range(len(full_date)) : 
-        date = full_date[k]    
-        if date >= timeframe[0] and date <= timeframe[1] : 
-            if date.weekday() >= 5 or date in None_working_days : 
-                P = 5
-            else : 
-                month = date.month
-                time = date.hour + date.minute/60
-                j = 0
-                while not period_hours[month-1][j] or not in_period(period_hours[month-1][j], time) : 
-                    j += 1
-                P = j
-            Time[P].append(k)
-            Time_in_month[date.month - 1].add(k)
-    delta = timeframe[1] - timeframe[0]
-    Nbdays = delta.days
+    days.sort(key = lambda x : x.month)
+    n = len(days)
+    for k in range(n) : 
+        date = days[k]
+        if date.weekday() >= 5 or date in None_working_days : 
+            P = 5
+        else :
+            month = date.month
+            time = date.hour + date.minute/60
+            j = 0
+            while not period_hours[month-1][j] or not in_period(period_hours[month-1][j], time) : 
+                j += 1
+            P = j
+        Time[P].append(k)
+        Time_in_month[date.month - 1].add(k)
+    Nbdays = n
     return Time, Nbdays, Time_in_month
