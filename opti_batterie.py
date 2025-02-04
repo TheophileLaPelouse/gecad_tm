@@ -39,14 +39,14 @@ Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen t
 Effd = 0.95 # order of magnitude, need to be looked into.
 
 #%% Model construction
-def calculate_price(model, Pprev, deltat, Egrid_plus, Egrid_minus, Pplus, Pminus, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
+def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
     Se = 0
     Seauto = 0
     Spena = 0
     Sp = 0
     Spena_P = [0.00001 for k in range(6)]
     for p in range(len(TP)) :
-        Sp += TP[p]*Pprev[p]*Nbdays
+        Sp += TP[p]*model.Pprev[p]*Nbdays
         if opti :  
             time_table = Time[p].value 
         else :
@@ -61,7 +61,7 @@ def calculate_price(model, Pprev, deltat, Egrid_plus, Egrid_minus, Pplus, Pminus
             # Pgrid = (Egrid_plus[t]+Egrid_minus[t])/deltat
             # Pgrid = Pcons[t] - Pd[t] - Eautocons[t]/deltat + Pc[t]
             # Spena_P[p] += ((Pgrid - Pprev[p] + abs(Pgrid - Pprev[p]))/2)**2 
-            Spena_P[p] += (Pplus[t, p])**2
+            Spena_P[p] += (model.Pplus[t, p])**2
         Spena_P[p] = Spena_P[p]**(1/2)
         Spena += Kp[p]*tep*Spena_P[p]
         
@@ -72,7 +72,7 @@ def battery_price(Cb, nbdays) :
     return (Cb*359/9+Cb*0.019)*nbdays/365
     # return 0
 
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
 
 def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
@@ -160,8 +160,7 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     
     
     
-    model.obj = pyo.Objective(expr=calculate_price(model, model.Pprev, model.deltat, model.Egrid_plus, model.Egrid_minus,
-                                                   model.Pplus, model.Pminus, model.TP, model.TE, model.TEauto, 
+    model.obj = pyo.Objective(expr=calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, 
                                                    model.Time, model.tep, model.Kp, Nbdays, Time_in_month) + battery_price(model.Cb, Nbdays), sense=pyo.minimize)
     return model
 
@@ -185,8 +184,9 @@ def solve(model, print_level = 7) :
 #%% Plot batterie usage 
 # model = build_model(timeframe)
 model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
-solver, results = solve(model)
 
+#%%
+solver, results = solve(model)
 real_time = [full_date[k] for k in model.time]
 
 result_E = [model.E[t].value for t in model.time]
@@ -236,3 +236,27 @@ plt.plot()
 # f = lambda x : p[0]*x**2 + p[1]*x + p[2]
 # plt.plot(range(n), times)
 # plt.plot(range(n), [f(k) for k in range(n)])
+
+#%% Test representative days month per month
+
+compare = []
+for k in range(1, 12) :
+    timerange = (dt.datetime(2024, k, 1, 0, 0), dt.datetime(2024, k, cal.monthrange(2024, k)[1], 23, 59))
+    model1 = build_model(timerange, definer=1)
+    solver, results = solve(model1)
+    standard_obj = model1.obj()
+    
+    repr_days = []
+    
+    i = 0
+    while full_date_new[i].month != k : 
+        i+=1
+    while full_date_new[i].month == k : 
+        repr_days.append(full_date_new[i])
+        i += 1 
+        
+    model2 = build_model(repr_days, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
+    solver2, results2 = solve(model2)
+    repr_obj = model2.obj()
+    compare.append((standard_obj, repr_obj))
+    
