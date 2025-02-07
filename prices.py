@@ -226,13 +226,13 @@ Time, Nbdays, _ = define_time(timeframe, period_hours)
 #%% Compute    
 
 # Using the cost from the official documents (prix2024.csv) but there are probably not the paid prices (they are way lower than the prices in the invoice)
-result1 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
+# result1 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
 
 
 # Using values from the invoice 
-TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
-TE = [0, 0, 0.145440, 0.167703, 0, 0.150691] # The 0 values are none important as the periods does not exist during the month of september.
-result2 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
+# TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
+# TE = [0, 0, 0.145440, 0.167703, 0, 0.150691] # The 0 values are none important as the periods does not exist during the month of september.
+# result2 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
 
 # Power : OK
 # Penalties : A bit on P6 => 6€ too much and not the same repartition between P3 and P4
@@ -240,7 +240,7 @@ result2 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, 
 
 # Just to see the total of energy in each period.
 # TE = [1, 1, 1, 1, 1, 1]
-result3 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
+# result3 = calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays)
 
 #%% utils
 
@@ -268,14 +268,17 @@ def search_dico(l, val, deb_or_fin = 'deb') :
         return fin
     
     
-def define_time2(days, period_hours, full_date=full_date) : 
+def define_time2(days, period_hours) : 
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
     days.sort(key = lambda x : x.month)
     n = len(days)
+    c = 1
+    previous_date = days[0].date()
     for k in range(n) : 
         date = days[k]
+        if date
         if date.weekday() >= 5 or date in None_working_days : 
             P = 5
         else :

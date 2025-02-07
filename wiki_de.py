@@ -105,7 +105,8 @@ def pyomo_translate(pyomo_model) :
                 variables[val.name] = c
                 values.append(var.value)
                 c += 1
-
+            
+            
     for val in comp : 
         if val.ctype == pyomo.core.base.constraint.Constraint : 
             if val.is_indexed() : 
@@ -181,10 +182,9 @@ def mean(l) :
     else : 
         return 0
     
-def differential_evolution(obj, variables, nb_iteration_max = 1000, nb_population = 100, F = 0.8, CR = 0.9, p0 = 100, p1= 100, lb=-500, ub=500, threshold = 10**(-5), nb_last_element = 10) :
+def differential_evolution(obj, n, nb_iteration_max = 1000, nb_population = 100, F = 0.8, CR = 0.9, p0 = 100, p1= 100, lb=-500, ub=500, threshold = 10**(-5), nb_last_element = 10) :
     if nb_population < 3 :
         raise ValueError("Population should be greater than 3")
-    n = len(variables)
     X = [[rd.uniform(lb, ub) for i in range(n)] for j in range(nb_population)]
     X_obj = [obj(x, p0, p1) for x in X]
     last_obj = min(X_obj)
@@ -235,8 +235,7 @@ def differential_evolution(obj, variables, nb_iteration_max = 1000, nb_populatio
     return(best, last_obj)
       
 # On va ajouter la notion de scaling à tout ça avant de continuer sur d'autres tests.  
-def PSO(obj, variables, nb_iteration_max = 1000, nb_population = 100, lb=-1000, ub=1000, w=0.2, p0=1000, p1=1000, threshold = 10**(-5), nb_last_element = 10) :
-    n = len(variables)
+def PSO(obj, n, nb_iteration_max = 1000, nb_population = 100, lb=-1000, ub=1000, w=0.2, p0=1000, p1=1000, threshold = 10**(-5), nb_last_element = 10) :
     X = [[rd.uniform(lb, ub) for i in range(n)] for j in range(nb_population)]
     X_obj = [obj(x, p0, p1) for x in X]
     Xbest = [[[X[k][i] for i in range(n)], X_obj[k]] for k in range(nb_population)]
@@ -283,7 +282,7 @@ def PSO(obj, variables, nb_iteration_max = 1000, nb_population = 100, lb=-1000, 
 #%%
 if __name__ == '__main__' : 
     # from opti_batterie import model
-    obj, variables, values, constraints = pyomo_translate(model)
+    obj, variables, values, constraints, truc1, truc2 = pyomo_translate(model)
     nb_population = 100
     n = len(variables)
     X = [[(rd.rand() - 0.5)*1000 for i in range(n)] for j in range(nb_population)]

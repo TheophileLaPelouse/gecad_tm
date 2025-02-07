@@ -7,8 +7,13 @@ from pyomo.opt import SolverFactory
 import os 
 
 #%%
-from prices import define_time, Pcons, Econs, Eautocons, TEauto, tep, Kp, period_hours
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+from representative_days import Econs_new, Eprod_new, full_date_new, days
 
+Pcons_new = [val/0.25 for val in Econs_new]
+Pprod_new = [val/0.25 for val in Eprod_new]
+
+Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
 TE = [
       [0.176631, 0.170670, 0, 0, 0, 0.125919], 
@@ -60,45 +65,55 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe =(dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 3, 23, 59))
+def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
 
-
-Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
-Nbdays += 1
-timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
-
-model = pyo.ConcreteModel()
-
-model.period = pyo.RangeSet(0, len(TP)-1)
-model.month = pyo.RangeSet(0, 10)
-model.time = pyo.RangeSet(timerange[0], timerange[1])
-
-model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=max(Pcons))
-# model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
-
-model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
-model.Econs = pyo.Param(model.time, initialize={t: Econs[t] for t in model.time})
-model.Eautocons = pyo.Param(model.time, initialize={t: Eautocons[t] for t in model.time})
-model.TP = pyo.Param(model.period, initialize={p: TP[p] for p in model.period})
-model.TE = pyo.Param(model.month, initialize={(m): TE[m] for m in model.month})
-model.TEauto = pyo.Param(model.period, initialize={p: TEauto[p] for p in model.period})
-model.Time = pyo.Param(model.period, initialize={p: Time[p] for p in model.period}, mutable=True)
-model.tep = pyo.Param(initialize=tep)
-model.Kp = pyo.Param(model.period, initialize={p : Kp[p] for p in model.period})
-
-# model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.P_minus_P, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays))
-model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month))
-
-def Pprev_rule(model, p) : 
-    if p == model.period.last() :
-        return model.Pprev[p] >= 0
-    return model.Pprev[p] <= model.Pprev[p+1]
-model.Pprev_con = pyo.Constraint(model.period, rule=Pprev_rule)
-
-model.Pprev_con1 = pyo.Constraint(expr=model.Pprev[0] >= 0)
+    if definer == 1 :
+        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+        Nbdays += 1
+        timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+    elif definer == 2 :
+        Time, Nbdays, Time_in_month = define_time2(timeframe, period_hours)
+        timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+    else : 
+        raise ValueError("definer must be 1 or 2")
+    
+    model = pyo.ConcreteModel()
+    
+    model.period = pyo.RangeSet(0, len(TP)-1)
+    model.month = pyo.RangeSet(0, 10)
+    model.time = pyo.RangeSet(timerange[0], timerange[1])
+    
+    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=max(Pcons))
+    # model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
+    
+    model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
+    model.Econs = pyo.Param(model.time, initialize={t: Econs[t] for t in model.time})
+    model.Eautocons = pyo.Param(model.time, initialize={t: Eautocons[t] for t in model.time})
+    model.TP = pyo.Param(model.period, initialize={p: TP[p] for p in model.period})
+    model.TE = pyo.Param(model.month, initialize={(m): TE[m] for m in model.month})
+    model.TEauto = pyo.Param(model.period, initialize={p: TEauto[p] for p in model.period})
+    model.Time = pyo.Param(model.period, initialize={p: Time[p] for p in model.period}, mutable=True)
+    model.tep = pyo.Param(initialize=tep)
+    model.Kp = pyo.Param(model.period, initialize={p : Kp[p] for p in model.period})
+    model.Nbdays = pyo.Param(initialize=Nbdays)
+    
+    # model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.P_minus_P, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays))
+    model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month))
+    
+    def Pprev_rule(model, p) : 
+        if p == model.period.last() :
+            return model.Pprev[p] >= 0
+        return model.Pprev[p] <= model.Pprev[p+1]
+    model.Pprev_con = pyo.Constraint(model.period, rule=Pprev_rule)
+    
+    model.Pprev_con1 = pyo.Constraint(expr=model.Pprev[0] >= 0)
+    
+    return model
 
 
 #%% Solver 
-
+model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
+# model = build_model(timeframe)
 solver = SolverFactory('ipopt')
 # solver.options['print_level'] = 
 solver.options['print_timing_statistics'] = 'yes'
@@ -116,7 +131,7 @@ opti = [model.Pprev[p].value for p in model.period]
 original = [120, 120, 120, 120, 120, 190]
 price = model.obj()
 
-original_price = calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = False)
+original_price = calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, model.Time, tep, Kp, model.Nbdays, model.Time_in_month, opti = True)
 decrease = (original_price - price)/original_price
 
 def last_day(any_day):

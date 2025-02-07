@@ -72,10 +72,10 @@ def battery_price(Cb, nbdays) :
     return (Cb*359/9+Cb*0.019)*nbdays/365
     # return 0
 
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 5, 1, 0, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
 
-def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
+def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False) :
 
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -158,7 +158,8 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     # = model.Egrid_plus[t]/model.deltat - model.Egrid_minus[t]/model.deltat - Pprev[p]
     model.grid_con_naive = pyo.Constraint(model.time, model.period, rule=Pgrid_rule_naive)
     
-    
+    if without_bat : 
+        model.no_bat = pyo.Constraint(expr=model.Cb==0)
     
     model.obj = pyo.Objective(expr=calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, 
                                                    model.Time, model.tep, model.Kp, Nbdays, Time_in_month) + battery_price(model.Cb, Nbdays), sense=pyo.minimize)
@@ -182,8 +183,21 @@ def solve(model, print_level = 7) :
 # model.display()
 
 #%% Plot batterie usage 
-# model = build_model(timeframe)
-model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
+model = build_model(timeframe, without_bat=True)
+
+full_date_new_simple = []
+filled_days = set()
+for date in full_date_new : 
+    if date.date() not in filled_days :
+        c = 0
+        filled_days.add(date.date())
+    if c < 2 : 
+        full_date_new_simple.append(date)
+    c += 1
+        
+
+# model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
+# model = build_model(full_date_new_simple, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new)  # N'a pas vraiment de sens mais c'est du test
 
 #%%
 solver, results = solve(model)
