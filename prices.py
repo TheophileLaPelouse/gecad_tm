@@ -278,7 +278,9 @@ def define_time2(days, period_hours) :
     previous_date = days[0].date()
     for k in range(n) : 
         date = days[k]
-        if date
+        if date.date() != previous_date : 
+            c += 1
+            previous_date = date.date()
         if date.weekday() >= 5 or date in None_working_days : 
             P = 5
         else :
@@ -290,5 +292,5 @@ def define_time2(days, period_hours) :
             P = j
         Time[P].append(k)
         Time_in_month[date.month - 1].add(k)
-    Nbdays = n
+    Nbdays = c
     return Time, Nbdays, Time_in_month

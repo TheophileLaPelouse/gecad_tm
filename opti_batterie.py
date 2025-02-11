@@ -9,12 +9,8 @@ import matplotlib.pyplot as plt
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
-from representative_days import Econs_new, Eprod_new, full_date_new, days
+from representative_days import create_data, gen_new_data
 
-Pcons_new = [val/0.25 for val in Econs_new]
-Pprod_new = [val/0.25 for val in Eprod_new]
-
-Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
 TE = [
       [0.176631, 0.170670, 0, 0, 0, 0.125919], 
@@ -71,12 +67,21 @@ def battery_price(Cb, nbdays) :
     # investment = 359 $/kwh/year, maintenance = 0.019$/kwh/year, lifetime = 9 years
     return (Cb*359/9+Cb*0.019)*nbdays/365
     # return 0
+    
+def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) : 
+    if Pd is None :
+        return 0.1*sum(p for p in Pc)
+    else : 
+        if time is None :
+            return 0.1*sum(Pc[t]*Pd[t] for t in range(len(Pc)))
+        else : 
+            return 0.1*sum(Pc[t]*Pd[t] for t in time)
 
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 5, 1, 0, 59))
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
 
-def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False) :
-
+def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False) :
+    Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
         Nbdays += 1
@@ -98,6 +103,7 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     # Battery
     model.Pc = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
+    # model.notPc_Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.E = pyo.Var(model.time, domain=pyo.NonNegativeReals)
     model.Cb = pyo.Var(domain = pyo.NonNegativeReals)
     
@@ -158,11 +164,18 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     # = model.Egrid_plus[t]/model.deltat - model.Egrid_minus[t]/model.deltat - Pprev[p]
     model.grid_con_naive = pyo.Constraint(model.time, model.period, rule=Pgrid_rule_naive)
     
+    # def charge_discharge_rule(model, t) : 
+    #     return(model.notPc_Pd[t] == model.Pc*model.Pd[t])
+    
     if without_bat : 
         model.no_bat = pyo.Constraint(expr=model.Cb==0)
     
     model.obj = pyo.Objective(expr=calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, 
-                                                   model.Time, model.tep, model.Kp, Nbdays, Time_in_month) + battery_price(model.Cb, Nbdays), sense=pyo.minimize)
+                                                   model.Time, model.tep, model.Kp, Nbdays, Time_in_month) 
+                              + battery_price(model.Cb, Nbdays)
+                              + pena_charge_and_discharge(model.Pc, model.Pd, time=model.time, coef=pena)
+                              , sense=pyo.minimize
+                              )
     return model
 
 
@@ -181,6 +194,18 @@ def solve(model, print_level = 7) :
     results = solver.solve(model, tee=True)
     return solver, results
 # model.display()
+
+#%% Penalization variable test
+
+Pena2test = [0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 10, 100, 1000, 10000]
+res = []
+for coef in Pena2test : 
+    model = build_model(timeframe, pena=coef)
+    solver, results = solve(model)
+    Pc = [model.Pc[t].value for t in model.time.data()]
+    Pd = [model.Pd[t].value for t in model.time.data()]
+    res.append((model.obj(), pena_charge_and_discharge(Pc, Pd, coef=coef)))
+    
 
 #%% Plot batterie usage 
 model = build_model(timeframe, without_bat=True)

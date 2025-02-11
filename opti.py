@@ -5,13 +5,15 @@ import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 import os 
+from numpy.random import rand
+import matplotlib.pyplot as plt 
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
-from representative_days import Econs_new, Eprod_new, full_date_new, days
+from representative_days import create_data, gen_new_data
 
-Pcons_new = [val/0.25 for val in Econs_new]
-Pprod_new = [val/0.25 for val in Eprod_new]
+# Pcons_new = [val/0.25 for val in Econs_new]
+# Pprod_new = [val/0.25 for val in Eprod_new]
 
 Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
@@ -64,9 +66,9 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
 
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
-# timeframe =(dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 3, 23, 59))
-def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, Pcons=Pcons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
-
+# timeframe =(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 1, 30, 23, 59))
+def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
+    Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
         Nbdays += 1
@@ -95,7 +97,6 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     model.Time = pyo.Param(model.period, initialize={p: Time[p] for p in model.period}, mutable=True)
     model.tep = pyo.Param(initialize=tep)
     model.Kp = pyo.Param(model.period, initialize={p : Kp[p] for p in model.period})
-    model.Nbdays = pyo.Param(initialize=Nbdays)
     
     # model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.P_minus_P, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays))
     model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month))
@@ -108,16 +109,105 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     
     model.Pprev_con1 = pyo.Constraint(expr=model.Pprev[0] >= 0)
     
-    return model
+    return model, Time_in_month, Nbdays
 
+
+#%% Compare days choices 
+
+def test_method(number_rand=10, number_coef=10, n_init=5) : 
+    
+    results_test_rand = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': []}
+    results_test_coef = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': []}
+    for k in range(number_rand + number_coef) :
+        if k < number_rand : 
+            Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=10)
+        else : 
+            r = rand()
+            coef = 0.5+r*1.5
+            Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=0, coef_Econs=coef, coef_Eprod=coef)
+        Econs_new1, Eprod_new1, full_date_new1, days1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
+        Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="kmean_max", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+        
+        model1, Time_in_month1, Nbdays1 = build_model(full_date_new1, definer=2, Econs=Econs_new1, Eautocons=Eprod_new1)
+        model2, Time_in_month2, Nbdays2 = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2)
+        model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test)
+        
+        solver = SolverFactory('ipopt')
+        try : 
+            results_ref = solver.solve(model_year, tee=True)
+            results1 = solver.solve(model1, tee=True)
+            results2 = solver.solve(model2, tee=True)
+            results3 = solver.solve(model3, tee=True)
+            
+            # print('Objective value for reference model : ', model_year.obj())
+            # print('Objective value for model 1 : ', model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj())
+            # print('Objective value for model 2 : ', model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj())
+            # print('Objective value for model 3 : ', model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj())
+            if k < number_rand : 
+                results_test_rand['quantile'].append((model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj()))
+                results_test_rand['kmean_max'].append((model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj()))
+                results_test_rand['kmean_barycenter'].append((model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj()))
+                results_test_rand['reference'].append((model_year.obj(), 0))
+            else : 
+                results_test_coef['quantile'].append((model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj()))
+                results_test_coef['kmean_max'].append((model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj()))
+                results_test_coef['kmean_barycenter'].append((model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj()))
+                results_test_coef['reference'].append((model_year.obj(), 0))
+        except :
+            print("ça a raté une fois")
+    # And to finish, with the original data
+    Econs_test=Econs 
+    Eprod_test=Eautocons
+    
+    Econs_new1, Eprod_new1, full_date_new1, days1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
+    Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="kmean_max", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+    Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+    
+    model1, Time_in_month1, Nbdays1 = build_model(full_date_new1, definer=2, Econs=Econs_new1, Eautocons=Eprod_new1)
+    model2, Time_in_month2, Nbdays2 = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2)
+    model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+    model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test)
+    results_test_rand['reference'].append((model_year.obj(), 0))
+    results_test_rand['quantile'].append((model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj()))
+    results_test_rand['kmean_max'].append((model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj()))
+    results_test_rand['kmean_barycenter'].append((model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj()))
+    
+    
+    FIG = []
+    for val in results_test_coef : 
+        re = [abs(results_test_coef[val][k][1]) for k in range(len(results_test_coef[val]))]
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        ax.plot(re, '+', label=val)
+        ax.set_thetagrids(())
+        ax.plot([0 for k in range(len(re))], 'o', label='reference')
+        ax.set_title('test coef %s' % val)
+        FIG.append((fig, ax))
+    for val in results_test_rand : 
+        # print(results_test_rand[val][k])
+        re = [abs(results_test_rand[val][k][1]) for k in range(len(results_test_rand[val]))]
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        ax.set_thetagrids(())
+        ax.plot(re, '+')
+        ax.plot([0 for k in range(len(re))], 'o', label='reference')
+        ax.set_title('test rand %s' % val)
+        
+    plt.show()
+    return results_test_coef, results_test_rand, FIG
 
 #%% Solver 
-model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
-# model = build_model(timeframe)
+
+# model, Time_in_month, Nbdays = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
+Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=20)
+model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test)
+model = model_year
 solver = SolverFactory('ipopt')
 # solver.options['print_level'] = 
 solver.options['print_timing_statistics'] = 'yes'
 results = solver.solve(model, tee=True)
+print(model.obj())
+# results_year = solver.solve(model_year, tee=True)
 # model.display()
 
 
@@ -131,7 +221,7 @@ opti = [model.Pprev[p].value for p in model.period]
 original = [120, 120, 120, 120, 120, 190]
 price = model.obj()
 
-original_price = calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, model.Time, tep, Kp, model.Nbdays, model.Time_in_month, opti = True)
+original_price = calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, model.Time, tep, Kp, Nbdays, Time_in_month, opti = True)
 decrease = (original_price - price)/original_price
 
 def last_day(any_day):
