@@ -70,12 +70,12 @@ def battery_price(Cb, nbdays) :
     
 def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) : 
     if Pd is None :
-        return 0.1*sum(p for p in Pc)
+        return coef*sum(p for p in Pc)
     else : 
         if time is None :
-            return 0.1*sum(Pc[t]*Pd[t] for t in range(len(Pc)))
+            return coef*sum(Pc[t]*Pd[t] for t in range(len(Pc)))
         else : 
-            return 0.1*sum(Pc[t]*Pd[t] for t in time)
+            return coef*sum(Pc[t]*Pd[t] for t in time)
 
 timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
@@ -197,15 +197,16 @@ def solve(model, print_level = 7) :
 
 #%% Penalization variable test
 
-Pena2test = [0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 10, 100, 1000, 10000]
+Pena2test = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 10, 100]
 res = []
 for coef in Pena2test : 
     model = build_model(timeframe, pena=coef)
     solver, results = solve(model)
     Pc = [model.Pc[t].value for t in model.time.data()]
     Pd = [model.Pd[t].value for t in model.time.data()]
-    res.append((model.obj(), pena_charge_and_discharge(Pc, Pd, coef=coef)))
+    res.append((model.obj(), pena_charge_and_discharge(Pc, Pd, coef=1)))
     
+# -> Choix de coefficients dans les calculs = 0.000001 car représente 1/100000 fois la valeur donc on peut dire que c'est négligeable
 
 #%% Plot batterie usage 
 model = build_model(timeframe, without_bat=True)

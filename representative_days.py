@@ -6,6 +6,8 @@ from tslearn.barycenters import dtw_barycenter_averaging
 from tslearn.metrics import dtw
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import silhouette_samples
+from random import random
 
 from prices import define_time, Econs, Eautocons as Eprod, TEauto, tep, Kp, period_hours, full_date, last_day, search_dico
 
@@ -304,9 +306,9 @@ def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n
         
     return days_by_clusters, results, silhouette, km
 
-def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10) : 
+def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10, no_plot=False) : 
     # For running test    
-    ts = np.zeros((len(Days), len(ts_val[0]['date']), 2))
+    ts = np.zeros((len(Days), len(Days[0]['date']), 2))
     for k in range(len(Days)) : 
         for i in range(len(Days[0]['date'])) :
             ts[k, i, 0] = Days[k]['Econs'][i]
@@ -317,36 +319,38 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
     # km = KernelKMeans(n_clusters=nb_cluster, max_iter=max_iter, tol=tol, n_init=n_init)
     # km = KShape(n_clusters=nb_cluster, max_iter=max_iter, tol=tol, n_init=n_init)
     clusters = km.fit_predict(formatted)
-    silhouette = silhouette_score(formatted, clusters)
+    silhouette_mean = silhouette_score(formatted, clusters)
+    # silhouette_all = silhouette_samples(formatted, clusters)
     
     days_by_clusters = [[] for k in range(nb_cluster)]
     for k in range(len(clusters)) : 
         days_by_clusters[clusters[k]].append(k)
         
     results = [{'ratios' : []} for k in range(nb_cluster)]
-    c = 0
-    for days in days_by_clusters : 
-        fig1, ax1 = plt.subplots()
-        fig2, ax2 = plt.subplots()
-        result = results[c]
-        formatted_in_cluster = formatted[days]
-        bar = dtw_barycenter_averaging(formatted_in_cluster)
-        # Etotmax = max([max(abs(formatted[day])) for day in days])
-        for day in days :
-            result['ratios'].append(calculate_ratio(day, Days))
-            ax1.plot(range(len(Days[day]['Etot'])), Days[day]['Econs'])
-            ax2.plot(range(len(Days[day]['Etot'])), Days[day]['Eprod'])
-        ax1.plot(range(len(bar[:, 0])), bar[:, 0], linewidth=2, color='red', label='Cluster Barycenter')
-        ax1.set_title('cons %d    %s' % (c, str(days)))
-        ax2.plot(range(len(bar[:, 1])), bar[:, 1], linewidth=2, color='red', label='Cluster Barycenter')
-        ax2.set_title('prod %d    %s' % (c, str(days)))
-        result['bar'] = bar
-        result['plot'] = (fig1, ax1, fig2, ax2)
-        c +=1
+    if not no_plot :
+        c = 0
+        for days in days_by_clusters : 
+            fig1, ax1 = plt.subplots()
+            fig2, ax2 = plt.subplots()
+            result = results[c]
+            formatted_in_cluster = formatted[days]
+            bar = dtw_barycenter_averaging(formatted_in_cluster)
+            # Etotmax = max([max(abs(formatted[day])) for day in days])
+            for day in days :
+                result['ratios'].append(calculate_ratio(day, Days))
+                ax1.plot(range(len(Days[day]['Etot'])), Days[day]['Econs'])
+                ax2.plot(range(len(Days[day]['Etot'])), Days[day]['Eprod'])
+            ax1.plot(range(len(bar[:, 0])), bar[:, 0], linewidth=2, color='red', label='Cluster Barycenter')
+            ax1.set_title('cons %d    %s' % (c, str(days)))
+            ax2.plot(range(len(bar[:, 1])), bar[:, 1], linewidth=2, color='red', label='Cluster Barycenter')
+            ax2.set_title('prod %d    %s' % (c, str(days)))
+            result['bar'] = bar
+            result['plot'] = (fig1, ax1, fig2, ax2)
+            c +=1
         
-    plt.show()
+        plt.show()
         
-    return days_by_clusters, results, silhouette, km
+    return days_by_clusters, results, silhouette_mean, km
 
 def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_iter = 100, tol=1e-06, n_init = 5) : 
     # For the optimization
@@ -388,12 +392,51 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
             new_Econs.append(bar[:, 0])
             new_Eprod.append(bar[:, 1])
         return new_Econs, new_Eprod
+    
+    elif method=="random" : 
+        ts = np.zeros((len(Days), len(Days[0]['date']), 2))
+        for k in range(len(Days)) : 
+            for i in range(len(Days[0]['date'])) :
+                ts[k, i, 0] = Days[k]['Econs'][i]
+                ts[k, i, 1] = Days[k]['Eprod'][i]
+        km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
+        clusters = km.fit_predict(ts)
+        days_by_clusters = [[] for k in range(nb_cluster)]
+        for k in range(len(clusters)) : 
+            days_by_clusters[clusters[k]].append(k)
+        
+        nb_days = len(Days)
+        cluster_prob = [len(val)/nb_days for val in days_by_clusters]
+        wanted = 50
+        Nb_chosen_clust = [int(val*wanted) + int(random()<(val*wanted-int(val*wanted))) for val in cluster_prob]
+        chosen = []
+        for k in range(len(Nb_chosen_clust)) : 
+            chosen += list(np.random.choice(days_by_clusters[k], size=Nb_chosen_clust[k], replace=False))
+        return chosen
+            
+        
 
-def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, Eprod=Eprod, TE=TE, period_hours=period_hours, full_date=full_date) : 
+def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, Eprod=Eprod, TE=TE, period_hours=period_hours, full_date=full_date, forced_timeframe=None, nb_days=5) : 
     Econs_new = []
     Eprod_new = []
     full_date_new = []
     days = []
+    if method == "year" : 
+        if forced_timeframe is None : 
+            timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 30, 23, 59))
+        else : timeframe = forced_timeframe
+        index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
+        Econs_m = [Econs[k] for k in index]
+        Eprod_m = [Eprod[k] for k in index]
+        full_date_m = [full_date[k] for k in index]
+        cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
+        chosen = generate_typical_kmean(cluster_Days, nb_days, method="random", tol=1e-08, n_init=n_init, metric="dtw")
+        print('chosen', len(chosen))
+        for day in chosen : 
+            Econs_new += cluster_Days[day]['Econs']
+            Eprod_new += cluster_Days[day]['Eprod']
+            full_date_new += cluster_Days[day]['date']
+            days.append(cluster_Days[day]['date'][0].date())
     for m in months :
         if method == "quantile" :
             Days, _ = select_days2(m, TE, Econs, Eprod, period_hours, full_date, [], [0.05, 0.25, 0.5, 0.75, 0.95])
@@ -403,26 +446,30 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
                 full_date_new += [full_date[k] for k in create_index(Days[key]['day'], full_date)[:-1]]
                 days.append(Days[key]['day']) # For verification sake
         elif method == "kmean_max" : 
-            timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
+            if forced_timeframe is None : 
+                timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
+            else : timeframe = forced_timeframe
             index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
             Econs_m = [Econs[k] for k in index]
             Eprod_m = [Eprod[k] for k in index]
             full_date_m = [full_date[k] for k in index]
             cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
-            chosen_days = generate_typical_kmean(cluster_Days, 5, tol=1e-08, n_init=n_init, metric="dtw")
+            chosen_days = generate_typical_kmean(cluster_Days, nb_days, tol=1e-08, n_init=n_init, metric="dtw")
             for day in chosen_days :
                 Econs_new += cluster_Days[day]['Econs']
                 Eprod_new += cluster_Days[day]['Eprod']
                 full_date_new += cluster_Days[day]['date']
                 days.append(cluster_Days[day]['date'][0].date())
         elif method == "kmean_barycenter" :
-            timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
+            if forced_timeframe is None : 
+                timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
+            else : timeframe = forced_timeframe
             index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
             Econs_m = [Econs[k] for k in index]
             Eprod_m = [Eprod[k] for k in index]
             full_date_m = [full_date[k] for k in index]
             cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
-            Econs_val, Eprod_val = generate_typical_kmean(cluster_Days, 5, method="barycenter", tol=1e-08, n_init=n_init, metric="dtw")
+            Econs_val, Eprod_val = generate_typical_kmean(cluster_Days, nb_days, method="barycenter", tol=1e-08, n_init=n_init, metric="dtw")
             random_day = np.random.choice(range(len(cluster_Days)), replace=False, size=5)
             for k in range(5) : 
                 Econs_new += list(Econs_val[k])
@@ -432,6 +479,8 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
                 full_date_new += cluster_Days[random_day[k]]['date']
                 
                 days.append(cluster_Days[random_day[k]]['date'][0].date())
+                
+    
             
     return Econs_new, Eprod_new, full_date_new, days
 
@@ -531,6 +580,28 @@ if __name__ == '__main__' :
     #     print(results_clus[k]['max_dif'])
         
     days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 5, tol=1e-08, n_init=10, metric="dtw")
+
+#%% Test cluster year        
+if __name__ == '__main__' : 
+    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 30, 23, 59))
+    index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
+    Econs_m = [Econs[k] for k in index]
+    Eprod_m = [Eprod[k] for k in index]
+    full_date_m = [full_date[k] for k in index]
+    cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
+    S = []
+    for k in range(1, 2) :
+        days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 5*k, tol=1e-08, n_init=1, metric="dtw", no_plot=True)
+        S.append(silhouette)
+        
+        
+    nb_days = (timeframe[1]-timeframe[0]).days + 1
+    cluster_prob = [len(val)/nb_days for val in days_by_clusters]
+    wanted = 50
+    Nb_chosen_clust = [int(val*wanted) + int(random()<(val*wanted-int(val*wanted))) for val in cluster_prob]
+    chosen = []
+    for k in range(len(Nb_chosen_clust)) : 
+        chosen += list(np.random.choice(days_by_clusters[k], size=Nb_chosen_clust[k], replace=False))
         
 #%% Test cluster max days
 if __name__ == '__main__' :

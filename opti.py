@@ -7,6 +7,7 @@ from pyomo.opt import SolverFactory
 import os 
 from numpy.random import rand
 import matplotlib.pyplot as plt 
+import pandas as pd
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
@@ -85,7 +86,7 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     model.month = pyo.RangeSet(0, 10)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
-    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=max(Pcons))
+    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 120, 120, 120, 120, 190])
     # model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
     
     model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
@@ -115,9 +116,21 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
 #%% Compare days choices 
 
 def test_method(number_rand=10, number_coef=10, n_init=5) : 
+    """
+    We will observe two things to test the interest of the methods.
     
-    results_test_rand = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': []}
-    results_test_coef = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': []}
+    First we will look at how far the optimal objective function will be from the reference model.
+    Second we will look at the diminution of the objective function compared to the diminution in the reference model.
+    """
+    
+    results_test_rand = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': [], 'dim_quantile': [], 'dim_kmean_max': [], 'dim_kmean_barycenter': [], 'dim_reference': []}
+    results_test_coef = {'quantile': [], 'kmean_max': [], 'kmean_barycenter': [], 'reference': [], 'dim_quantile': [], 'dim_kmean_max': [], 'dim_kmean_barycenter': [], 'dim_reference': []}
+    model_year, Time_in_month, Nbdays = build_model(timeframe)
+    no_obj_ref = model_year.obj()
+    solver = SolverFactory('ipopt')
+    results_ref = solver.solve(model_year, tee=True)
+    obj_ref = model_year.obj()
+    dim_ref = (no_obj_ref - obj_ref)/no_obj_ref
     for k in range(number_rand + number_coef) :
         if k < number_rand : 
             Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=10)
@@ -126,20 +139,25 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
             coef = 0.5+r*1.5
             Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=0, coef_Econs=coef, coef_Eprod=coef)
         Econs_new1, Eprod_new1, full_date_new1, days1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
-        Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="kmean_max", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+        Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="year", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test, forced_timeframe=timeframe)
         Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
         
         model1, Time_in_month1, Nbdays1 = build_model(full_date_new1, definer=2, Econs=Econs_new1, Eautocons=Eprod_new1)
         model2, Time_in_month2, Nbdays2 = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2)
         model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
-        model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test)
         
-        solver = SolverFactory('ipopt')
+        no_obj1 = model1.obj()
+        no_obj2 = model2.obj()
+        no_obj3 = model3.obj()
+        
         try : 
-            results_ref = solver.solve(model_year, tee=True)
             results1 = solver.solve(model1, tee=True)
             results2 = solver.solve(model2, tee=True)
             results3 = solver.solve(model3, tee=True)
+            
+            dim1 = (no_obj1 - model1.obj())/no_obj1
+            dim2 = (no_obj2 - model2.obj())/no_obj2
+            dim3 = (no_obj3 - model3.obj())/no_obj3
             
             # print('Objective value for reference model : ', model_year.obj())
             # print('Objective value for model 1 : ', model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj())
@@ -150,11 +168,22 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
                 results_test_rand['kmean_max'].append((model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj()))
                 results_test_rand['kmean_barycenter'].append((model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj()))
                 results_test_rand['reference'].append((model_year.obj(), 0))
+                
+                results_test_rand['dim_quantile'].append((dim1, abs(dim1-dim_ref)/dim_ref))
+                results_test_rand['dim_kmean_max'].append((dim2, abs(dim2-dim_ref)/dim_ref))
+                results_test_rand['dim_kmean_barycenter'].append((dim3, abs(dim3-dim_ref)/dim_ref))
+                results_test_rand['dim_reference'].append((dim_ref, 0))
             else : 
                 results_test_coef['quantile'].append((model1.obj()*Nbdays/Nbdays1, (model1.obj()*Nbdays/Nbdays1-model_year.obj())/model_year.obj()))
                 results_test_coef['kmean_max'].append((model2.obj()*Nbdays/Nbdays2, (model2.obj()*Nbdays/Nbdays2-model_year.obj())/model_year.obj()))
                 results_test_coef['kmean_barycenter'].append((model3.obj()*Nbdays/Nbdays3, (model3.obj()*Nbdays/Nbdays3-model_year.obj())/model_year.obj()))
                 results_test_coef['reference'].append((model_year.obj(), 0))
+                
+                results_test_coef['dim_quantile'].append((dim1, abs(dim1-dim_ref)/dim_ref))
+                results_test_coef['dim_kmean_max'].append((dim2, abs(dim2-dim_ref)/dim_ref))
+                results_test_coef['dim_kmean_barycenter'].append((dim3, abs(dim3-dim_ref)/dim_ref))
+                results_test_coef['dim_reference'].append((dim_ref, 0))
+                
         except :
             print("ça a raté une fois")
     # And to finish, with the original data
@@ -184,6 +213,7 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
         ax.plot([0 for k in range(len(re))], 'o', label='reference')
         ax.set_title('test coef %s' % val)
         FIG.append((fig, ax))
+        
     for val in results_test_rand : 
         # print(results_test_rand[val][k])
         re = [abs(results_test_rand[val][k][1]) for k in range(len(results_test_rand[val]))]
@@ -196,18 +226,54 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
     plt.show()
     return results_test_coef, results_test_rand, FIG
 
-#%% Solver 
+def search_best_repr() : 
+    Econs_save = []
+    Eprod_save = []
+    full_date_save = []
+    score = 1
+    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+    model_year, Time_in_month, Nbdays = build_model(timeframe)
+    solver = SolverFactory('ipopt')
+    results_ref = solver.solve(model_year, tee=True)
+    obj_ref = model_year.obj()
+    
+    for k in range(20) : 
+        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe)
+        model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        results3 = solver.solve(model3, tee=True)
+        obj3 = model3.obj()*Nbdays/Nbdays3
+        if abs(obj3-obj_ref)/obj_ref < score : 
+            score = abs(obj3-obj_ref)/obj_ref
+            Econs_save = Econs_new3[:]
+            Eprod_save = Eprod_new3[:]
+            full_date_save = full_date_new3[:]
+    
+    df = pd.DataFrame(columns=['Econs', 'Eprod', 'full_date'], index=range(len(Econs_save)))
+    df['Econs'] = Econs_save
+    df['Eprod'] = Eprod_save
+    df['full_date'] = full_date_save
+    df.to_csv('Results/csv/best_repr.csv', sep=';', index=False)
+    return Econs_save, Eprod_save, full_date_save, score
 
+#%% Solver 
+TE_test = [[0 for k in range(6)] for i in range(11)]
+TE_test=TE 
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
 # model, Time_in_month, Nbdays = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
-Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=20)
-model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test)
-model = model_year
+Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=0)
+Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="year", n_init=1, forced_timeframe=timeframe, nb_days=36)
+
+model_year, Time_in_month, Nbdays_year = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test, TE=TE_test)
+# model = model_year
+model, Time_in_month, Nbdays = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2, TE=TE_test)
+noopti = model.obj()
+noopti_year = model_year.obj()
 solver = SolverFactory('ipopt')
 # solver.options['print_level'] = 
 solver.options['print_timing_statistics'] = 'yes'
 results = solver.solve(model, tee=True)
-print(model.obj())
-# results_year = solver.solve(model_year, tee=True)
+# print(model.obj())
+results_year = solver.solve(model_year, tee=True)
 # model.display()
 
 
