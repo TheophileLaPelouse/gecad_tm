@@ -6,6 +6,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 import os 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
@@ -33,6 +34,18 @@ TE = [
 charge_rate = 0.5 
 Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen the losses if come from PV ? Maybe
 Effd = 0.95 # order of magnitude, need to be looked into.
+
+#%% representative days 
+
+path_repr = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+if not os.path.exists(path_repr) :
+    raise ValueError('You must run opti.search_best_repr first')
+    
+df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
+
+Econs_repr = df['Econs']
+Eprod_repr = df['Eprod']
+full_date_repr = df['full_date']
 
 #%% Model construction
 def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
@@ -209,21 +222,22 @@ for coef in Pena2test :
 # -> Choix de coefficients dans les calculs = 0.000001 car représente 1/100000 fois la valeur donc on peut dire que c'est négligeable
 
 #%% Plot batterie usage 
-model = build_model(timeframe, without_bat=True)
+# model = build_model(timeframe, without_bat=True)
 
-full_date_new_simple = []
-filled_days = set()
-for date in full_date_new : 
-    if date.date() not in filled_days :
-        c = 0
-        filled_days.add(date.date())
-    if c < 2 : 
-        full_date_new_simple.append(date)
-    c += 1
+# full_date_new_simple = []
+# filled_days = set()
+# for date in full_date_new : 
+#     if date.date() not in filled_days :
+#         c = 0
+#         filled_days.add(date.date())
+#     if c < 2 : 
+#         full_date_new_simple.append(date)
+#     c += 1
         
 
 # model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
 # model = build_model(full_date_new_simple, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new)  # N'a pas vraiment de sens mais c'est du test
+model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr)
 
 #%%
 solver, results = solve(model)

@@ -169,7 +169,7 @@ class Model :
         
 class Individual(Model) : 
     # Represent one individual/particle/thing of the model
-    def __init__(self, model, pl=1, pq=1, velocity=False) : 
+    def __init__(self, model, pl=1, pq=1, pso=False) : 
         for param in model.Param : 
             setattr(self, param, getattr(model, param)) 
             # This is not a copy so it is really fast and does not change anything in term of memory
@@ -178,12 +178,17 @@ class Individual(Model) :
         for var in model.Var : 
             tab = (rd.rand(*getattr(model, var).shape) * (model.opti_bounds[var][1] - model.opti_bounds[var][0]) + model.opti_bounds[var][0])
             setattr(self, var, tab)
-            if velocity :
+            if pso :
                 tab = (rd.rand(*getattr(model, var).shape) -0.5) * (model.opti_bounds[var][1] - model.opti_bounds[var][0]) * 2
                 setattr(self, var+'__v', tab)
+ 
         self.pl = pl 
         self.pq = pq
         self.fitness = self.obj(pl, pq)[0][0]
+        if pso : 
+            self.best = Individual(model, pl, pq)
+            self.best = self.best.copy_var(self)
+            self.best.fitness=self.fitness
             
             
     def copy_var(self, indiv) : 
@@ -320,103 +325,53 @@ class GA :
     # Mutation : 6s
     # Other : none
             
-            
-def PSO(obj, n, nb_iteration_max = 1000, nb_population = 100, lb=-1000, ub=1000, w=0.2, p0=1000, p1=1000, threshold = 10**(-5), nb_last_element = 10) :
-    X = [[rd.uniform(lb, ub) for i in range(n)] for j in range(nb_population)]
-    X_obj = [obj(x, p0, p1) for x in X]
-    Xbest = [[[X[k][i] for i in range(n)], X_obj[k]] for k in range(nb_population)]
-    last_obj = min(X_obj)
-    best = [min(X, key = lambda x : obj(x, p0, p1)), last_obj]
-    
-    phi_max = 2.5
-    phi_min = 0.5
-    nb_iter = 0
-    last_obj = [last_obj]
-    V = [[rd.uniform(abs(lb-ub), abs(ub-lb)) for i in range(n)] for j in range(nb_population)]
-    while nb_iter < nb_iteration_max and not no_evolution(last_obj, threshold, nb_last_element) :
-        # p1+=(nb_iter//200)*0.5
-        print()
-        print(last_obj[-1])
-        print(last_obj[-1]/last_obj[0])
-        print(nb_iter)
-        phig = (phi_max - phi_min)*nb_iter/nb_iteration_max + phi_min
-        phip = (phi_min - phi_max)*nb_iter/nb_iteration_max + phi_max
-        w = ((1/2*(phig + phip) - 1) + 1)/2
-        for k in range(nb_population) :
-            for j in range(n) :
-                rp, rg = rd.rand(), rd.rand()
-                # print(len(Xbest))
-                V[k][j] = w*V[k][j] + phip*rp*(Xbest[k][0][j]- X[k][j]) + phig*rg*(best[0][j]-X[k][j])
-                X[k][j] += V[k][j]
-            x_obj = obj(X[k], p0, p1)
-            if x_obj < Xbest[k][1] : 
-                Xbest[k] = [X[k][:], x_obj]
-            if x_obj < best[1] : 
-                best = [X[k][:], x_obj]
-                last_obj.append(best[1])
-        nb_iter += 1
-    return(best)
-
 class PSO:
-    def __init__(self, model, nb_pop=100, nb_gen=1000, lb=-1000, ub=1000, w=0.2, p0=1000, p1=1000, threshold=1e-5, nb_last_element=10):
+    def __init__(self, model, nb_pop=100, nb_gen=1000, lb=-1000, ub=1000, w=0.2, pl=1000, pq=1000, threshold=1e-5, nb_last_element=10):
         self.model = model
         self.nb_pop = nb_pop
         self.nb_gen = nb_gen
         self.w = w
-        self.p0 = p0
-        self.p1 = p1
+        self.pl = pl
+        self.pq = pq
         self.threshold = threshold
         self.nb_last_element = nb_last_element
         self.var_len = {var: len(getattr(self.model, var)) for var in self.model.Var}
+        self.phi_max=2.5
+        self.phi_min=0.5
         
         # Initialize population and velocities
-        self.Pop = np.array([Individual(model, p0, p1, velocity=True) for _ in range(nb_pop)])
+        self.Pop = np.array([Individual(model, pl, pq, velocity=True) for _ in range(nb_pop)])
         
         # Initialize best positions
-        self.Xbest = [[self.copy_individual(indiv), indiv.fitness] for indiv in self.Pop]
-        self.best = min(self.Xbest, key=lambda x: x[1])
-        self.best = [self.copy_individual(self.best[0]), self.best[1]]
-        self.last_obj = [self.best[1]]
+        self.best_indiv = Individual(model, pl, pq)
         
     
     def solve(self):
-        phi_max = 2.5
-        phi_min = 0.5
-        nb_iter = 0
-        
-        while nb_iter < self.nb_gen and not self.no_evolution():
-            print(f"Iteration {nb_iter}, Best Fitness: {self.best[1]}")
-            
-            phig = (phi_max - phi_min) * nb_iter / self.nb_gen + phi_min
-            phip = (phi_min - phi_max) * nb_iter / self.nb_gen + phi_max
-            w = ((1 / 2 * (phig + phip) - 1) + 1) / 2
-            
-            for k in range(self.nb_pop):
-                rp, rg = rd.rand(), rd.rand()
-                for var in self.model.Var:
-                    self.V[k][var] = w * self.V[k][var] + phip * rp * (getattr(self.Xbest[k][0], var) - getattr(self.Pop[k], var)) + phig * rg * (getattr(self.best[0], var) - getattr(self.Pop[k], var))
-                    new_var = getattr(self.Pop[k], var) + self.V[k][var]
-                    setattr(self.Pop[k], var, np.clip(new_var, self.lb, self.ub))
-                
-                self.Pop[k].fitness = self.Pop[k].obj(self.p0, self.p1)[0][0]
-                
-                if self.Pop[k].fitness < self.Xbest[k][1]:
-                    self.Xbest[k] = [self.copy_individual(self.Pop[k]), self.Pop[k].fitness]
-                
-                if self.Pop[k].fitness < self.best[1]:
-                    self.best = [self.copy_individual(self.Pop[k]), self.Pop[k].fitness]
-                    self.last_obj.append(self.best[1])
-            
-            nb_iter += 1
-    
-    def no_evolution(self):
-        if len(self.last_obj) < self.nb_last_element:
-            return False
-        for k in range(len(self.last_obj) - self.nb_last_element, len(self.last_obj) - 1):
-            if abs(self.last_obj[k] - self.last_obj[k + 1]) > self.threshold:
-                return False
-        return True
-    
+        c = 0 
+        while c < self.nb_gen and not no_evolution(self.last_obj, self.threshold, self.nb_last_element) :
+            sorted_indices = np.argsort([individual.fitness for individual in self.Pop])
+            self.Pop = self.Pop[sorted_indices]
+            phig = (self.phi_max - self.phi_min)*c/nb_gen + self.phi_min
+            phip = (self.phi_min - self.phi_max)*c/nb_gen + self.phi_max
+            w = ((1/2*(phig + phip) - 1) + 1)/2
+            for k in range(self.nb_population) :
+                for var in self.Var : 
+                    for j in self.var_len[var] :
+                        rp, rg = rd.rand(), rd.rand()
+                        Vel = getattr(self.Pop[k], var__v)
+                        Pos = getattr(self.Pop[k], var)
+                        Best = getattr(self.Pop[k].best, var)
+                        Vel[j] = w*Vel[j] + phig*rg*(getattr(self.best_indiv, var)[j] - Pos[j]) + phip*rp*(Best[j]-Pos[j])
+                        Pos[j] += Vel[j]
+                self.Pop[k].fitness = self.obj(self.pl, self.pq)[0][0]
+                if self.Pop[k].fitness < self.Pop[k].best.fitness : 
+                    self.Pop[k].best.copy_var(self.Pop[k])
+                    self.Pop[k].best.fitness = self.Pop[k].fitness
+                if self.Pop[k].fitness < self.best_indiv.fitness : 
+                    self.best_indiv.copy_var(self.Pop[k])
+                    self.best_indiv.fitness = self.Pop[k].fitness
+                    self.last_obj.append(self.best_indiv.fitness)  
+            c += 1
     def __call__(self):
         return self.best[0]
 

@@ -352,7 +352,7 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
         
     return days_by_clusters, results, silhouette_mean, km
 
-def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_iter = 100, tol=1e-06, n_init = 5) : 
+def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_iter = 100, tol=1e-06, n_init = 5, wanted=50) : 
     # For the optimization
     
     if method == 'max' :
@@ -407,7 +407,6 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
         
         nb_days = len(Days)
         cluster_prob = [len(val)/nb_days for val in days_by_clusters]
-        wanted = 50
         Nb_chosen_clust = [int(val*wanted) + int(random()<(val*wanted-int(val*wanted))) for val in cluster_prob]
         chosen = []
         for k in range(len(Nb_chosen_clust)) : 
@@ -416,7 +415,7 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
             
         
 
-def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, Eprod=Eprod, TE=TE, period_hours=period_hours, full_date=full_date, forced_timeframe=None, nb_days=5) : 
+def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, Eprod=Eprod, TE=TE, period_hours=period_hours, full_date=full_date, forced_timeframe=None, nb_days=5, wanted=50) : 
     Econs_new = []
     Eprod_new = []
     full_date_new = []
@@ -430,7 +429,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
         Eprod_m = [Eprod[k] for k in index]
         full_date_m = [full_date[k] for k in index]
         cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
-        chosen = generate_typical_kmean(cluster_Days, nb_days, method="random", tol=1e-08, n_init=n_init, metric="dtw")
+        chosen = generate_typical_kmean(cluster_Days, nb_days, method="random", tol=1e-08, n_init=n_init, metric="dtw", wanted=wanted)
         print('chosen', len(chosen))
         for day in chosen : 
             Econs_new += cluster_Days[day]['Econs']

@@ -255,6 +255,47 @@ def search_best_repr() :
     df.to_csv('Results/csv/best_repr.csv', sep=';', index=False)
     return Econs_save, Eprod_save, full_date_save, score
 
+def search_opti_wanted() :
+    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+    model_year, Time_in_month, Nbdays = build_model(timeframe)
+    solver = SolverFactory('ipopt')
+    results_ref = solver.solve(model_year, tee=True)
+    obj_ref = model_year.obj()
+    score = 1
+    Finals = []
+    for k in range(20) : 
+        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe)
+        model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        results3 = solver.solve(model3, tee=True)
+        obj3 = model3.obj()*Nbdays/Nbdays3
+        if abs(obj3-obj_ref)/obj_ref < score : 
+            score = abs(obj3-obj_ref)/obj_ref
+    final_score=score 
+    Finals.append(final_score)
+    c = 1
+    nb_cluster = 36
+    while final_score < 0.02 and 50-5*c >= 12: 
+        score = 1
+        for k in range(5) : 
+            print(Finals)
+            if 50-5*c > nb_cluster : 
+                nb_cluster -= 12
+            Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=nb_cluster, forced_timeframe=timeframe, wanted=50-5*c)
+            model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+            try : 
+                results3 = solver.solve(model3, tee=True)
+            except : 
+                obj3 = 1000000000
+            obj3 = model3.obj()*Nbdays/Nbdays3
+            if abs(obj3-obj_ref)/obj_ref < score : 
+                score = abs(obj3-obj_ref)/obj_ref
+            final_score = score
+            Finals.append(final_score)
+        c += 1
+        print(50-5*c)
+    return Finals
+        
+    
 #%% Solver 
 TE_test = [[0 for k in range(6)] for i in range(11)]
 TE_test=TE 
