@@ -86,7 +86,7 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     model.month = pyo.RangeSet(0, 10)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
-    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 120, 120, 120, 120, 190])
+    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 130, 130, 130, 130, 190])
     # model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
     
     model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
@@ -226,34 +226,44 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
     plt.show()
     return results_test_coef, results_test_rand, FIG
 
-def search_best_repr() : 
+def search_best_repr(wanted=50) : 
     Econs_save = []
     Eprod_save = []
     full_date_save = []
     score = 1
     timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
     model_year, Time_in_month, Nbdays = build_model(timeframe)
+    obj_max_ref = model_year.obj()
     solver = SolverFactory('ipopt')
     results_ref = solver.solve(model_year, tee=True)
     obj_ref = model_year.obj()
     
     for k in range(20) : 
-        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe)
+        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe, wanted=wanted)
         model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        score_max = abs(model3.obj()-obj_max_ref)/obj_max_ref
         results3 = solver.solve(model3, tee=True)
         obj3 = model3.obj()*Nbdays/Nbdays3
-        if abs(obj3-obj_ref)/obj_ref < score : 
-            score = abs(obj3-obj_ref)/obj_ref
+        score_min = abs(obj3-obj_ref)/obj_ref
+        score_min_max = score_min*score_max
+        current_ratios = [model3.Pprev[p].value/model_year.Pprev[p].value for p in range(6)]
+        mean_ratio = sum(current_ratios)/len(current_ratios)
+        if abs(mean_ratio-1) < score : 
+            score = abs(mean_ratio-1)
             Econs_save = Econs_new3[:]
             Eprod_save = Eprod_new3[:]
             full_date_save = full_date_new3[:]
+            score_min_save = score_min 
+            score_max_save = score_max
+            ratios = current_ratios[:]
+            
     
     df = pd.DataFrame(columns=['Econs', 'Eprod', 'full_date'], index=range(len(Econs_save)))
     df['Econs'] = Econs_save
     df['Eprod'] = Eprod_save
     df['full_date'] = full_date_save
     df.to_csv('Results/csv/best_repr.csv', sep=';', index=False)
-    return Econs_save, Eprod_save, full_date_save, score
+    return Econs_save, Eprod_save, full_date_save, score_min_save, score_max_save, score, ratios
 
 def search_opti_wanted() :
     timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
@@ -261,12 +271,15 @@ def search_opti_wanted() :
     solver = SolverFactory('ipopt')
     results_ref = solver.solve(model_year, tee=True)
     obj_ref = model_year.obj()
-    score = 1
+    score = 0.01
     Finals = []
-    for k in range(20) : 
+    for k in range(5) : 
         Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe)
         model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
-        results3 = solver.solve(model3, tee=True)
+        try : 
+            results3 = solver.solve(model3, tee=True)
+        except : 
+            pass
         obj3 = model3.obj()*Nbdays/Nbdays3
         if abs(obj3-obj_ref)/obj_ref < score : 
             score = abs(obj3-obj_ref)/obj_ref
@@ -276,21 +289,30 @@ def search_opti_wanted() :
     nb_cluster = 36
     while final_score < 0.02 and 50-5*c >= 12: 
         score = 1
+        print()
+        print(Finals)
+        if 50-5*c < nb_cluster : 
+            nb_cluster -= 12
+        print(nb_cluster, c)
+        print()
         for k in range(5) : 
-            print(Finals)
-            if 50-5*c > nb_cluster : 
-                nb_cluster -= 12
-            Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=nb_cluster, forced_timeframe=timeframe, wanted=50-5*c)
+            try : 
+                Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=nb_cluster, forced_timeframe=timeframe, wanted=50-5*c)
+            except Exception as e:
+                print(f"Error occurred: {e}")
+                print(f"Parameters: n_init=1, nb_days={nb_cluster}, forced_timeframe={timeframe}, wanted={50-5*c}")
+                raise
+                
             model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
             try : 
                 results3 = solver.solve(model3, tee=True)
             except : 
-                obj3 = 1000000000
+                pass
             obj3 = model3.obj()*Nbdays/Nbdays3
             if abs(obj3-obj_ref)/obj_ref < score : 
                 score = abs(obj3-obj_ref)/obj_ref
             final_score = score
-            Finals.append(final_score)
+        Finals.append(final_score)
         c += 1
         print(50-5*c)
     return Finals
