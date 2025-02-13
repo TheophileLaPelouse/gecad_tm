@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 #%%
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists
 from representative_days import create_data, gen_new_data
 
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
@@ -43,9 +43,9 @@ if not os.path.exists(path_repr) :
     
 df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
 
-Econs_repr = df['Econs']
-Eprod_repr = df['Eprod']
-full_date_repr = df['full_date']
+Econs_repr = series2lists(df['Econs'])
+Eprod_repr = series2lists(df['Eprod'])
+full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
 
 #%% Model construction
 def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
@@ -76,9 +76,9 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
         
     return Se + Seauto + Spena + Sp
 
-def battery_price(Cb, nbdays) :
+def battery_price(Cb, nbdays, bat_price=359/10+0.019) :
     # investment = 359 $/kwh/year, maintenance = 0.019$/kwh/year, lifetime = 9 years
-    return (Cb*359/9+Cb*0.019)*nbdays/365
+    return Cb*bat_price*nbdays/365
     # return 0
     
 def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) : 
@@ -90,10 +90,10 @@ def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) :
         else : 
             return coef*sum(Pc[t]*Pd[t] for t in time)
 
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
-# timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 3, 31, 23, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 
-def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False) :
+def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -160,7 +160,8 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     
     def battery_rule(model, t) : 
         if t == model.time.first() : 
-            return model.E[t] == (0.2*model.Cb + model.Cb)/2
+            # return model.E[t] == (0.2*model.Cb + model.Cb)/2
+            return model.E[t] == 0.2*model.Cb
             # return model.E[t] == 5
         return model.E[t] == model.E[t-1] + (Effc*model.Pc[t] - model.Pd[t]/Effd)*model.deltat
     model.battery_con = pyo.Constraint(model.time, rule=battery_rule)
@@ -185,7 +186,7 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     
     model.obj = pyo.Objective(expr=calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, 
                                                    model.Time, model.tep, model.Kp, Nbdays, Time_in_month) 
-                              + battery_price(model.Cb, Nbdays)
+                              + battery_price(model.Cb, Nbdays, bat_price=bat_price)
                               + pena_charge_and_discharge(model.Pc, model.Pd, time=model.time, coef=pena)
                               , sense=pyo.minimize
                               )
@@ -223,7 +224,7 @@ for coef in Pena2test :
 
 #%% Plot batterie usage 
 # model = build_model(timeframe, without_bat=True)
-
+# model = build_model(timeframe, pena=0.000001)
 # full_date_new_simple = []
 # filled_days = set()
 # for date in full_date_new : 
@@ -237,7 +238,32 @@ for coef in Pena2test :
 
 # model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
 # model = build_model(full_date_new_simple, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new)  # N'a pas vraiment de sens mais c'est du test
-model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr)
+model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0.000001)
+
+#%% Bat_price influence 
+obj = []
+bat = []
+pena_violation = []
+price = []
+for k in range(1) : 
+    bat_price = (359/10+0.019-1)*(k+1)/10 + 1
+    price.append(bat_price)
+    model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0, bat_price=bat_price)
+    solver, results = solve(model)
+    obj.append(model.obj())
+    bat.append(model.Cb.value)
+    Pc = [model.Pc[t].value for t in model.time.data()]
+    Pd = [model.Pd[t].value for t in model.time.data()]
+    pena_violation.append(pena_charge_and_discharge(Pc, Pd, coef=1))
+    
+def save_values(path = 'Results/csv/bat_price.csv') :
+    df = pd.DataFrame(columns=['Batterie size (kwh)', 'Objective function', 'Battery price'])
+    df['Batterie size (kwh)'] = bat 
+    df['Objective function'] = obj 
+    df['Battery price'] = bat 
+    df.to_csv(path, sep=';')
+    
+# save_values(path='Results/csv/bat_price_pena.csv')
 
 #%%
 solver, results = solve(model)

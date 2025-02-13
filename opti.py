@@ -226,7 +226,7 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
     plt.show()
     return results_test_coef, results_test_rand, FIG
 
-def search_best_repr(wanted=50) : 
+def search_best_repr(wanted=50, path='Results/csv/best_repr.csv') : 
     Econs_save = []
     Eprod_save = []
     full_date_save = []
@@ -262,7 +262,7 @@ def search_best_repr(wanted=50) :
     df['Econs'] = Econs_save
     df['Eprod'] = Eprod_save
     df['full_date'] = full_date_save
-    df.to_csv('Results/csv/best_repr.csv', sep=';', index=False)
+    df.to_csv(path, sep=';', index=False)
     return Econs_save, Eprod_save, full_date_save, score_min_save, score_max_save, score, ratios
 
 def search_opti_wanted() :

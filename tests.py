@@ -6,103 +6,134 @@ Created on Thu Jan 16 10:47:46 2025
 @author: theophilemounier
 """
 
-import pandas as pd 
-import datetime as dt
+# Model init_model(double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t *time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
+#     Model model;
+#     model.Econs = Econs;
+#     model.Eprod = Eprod;
+#     memcpy(model.indexPb, indexPb, 2 * sizeof(int));
+#     model.deltat = deltat;
+#     model.charge_rate = charge_rate;
+#     model.discharge_rate = discharge_rate;
+#     model.TE = TE;
+#     model.TP = TP;
+#     memcpy(model.indexPprev, indexPprev, 2 * sizeof(int));
+#     model.Nbdays = Nbdays;
+#     model.Kp = Kp;
+#     model.tep = tep;
+#     model.indexCb = indexCb;
+#     model.TB = TB;
+#     model.batterie_life = batterie_life;
+#     model.TBm = TBm;
+#     model.SOC = SOC;
+#     model.tot_time = tot_time;
+#     model.n_tot_time = n_tot_time;
+#     model.time = time;
+#     model.time_month = time_month;
+#     model.n_time_month = n_time_month;
+#     model.months = months;
+#     model.n_m = n_m;
+#     model.periods = periods;
+#     model.n_p = n_p;
+#     return model;
+# }
+import ctypes
 
-df_csv = pd.read_csv('Raw dataset/2_INV_INYECCION0/09_September.csv', sep=';', decimal= ',')
+lib = ctypes.CDLL('./libmodel.so')
+lib.init_model.argtypes = [ctypes.POINTER(ctypes.c_double), 
+                            ctypes.POINTER(ctypes.c_double),
+                            ctypes.POINTER(ctypes.c_int),
+                            ctypes.c_double,
+                            ctypes.c_double,
+                            ctypes.c_double,
+                            ctypes.POINTER(ctypes.POINTER(ctypes.c_double)),
+                            ctypes.POINTER(ctypes.c_double),
+                            ctypes.POINTER(ctypes.c_int),
+                            ctypes.c_int,
+                            ctypes.c_double,
+                            ctypes.c_double,
+                            ctypes.c_int,
+                            ctypes.c_double,
+                            ctypes.c_double,
+                            ctypes.POINTER(ctypes.c_double),
+                            ctypes.POINTER(ctypes.c_size_t),
+                            ctypes.POINTER(ctypes.c_size_t),
+                            ctypes.POINTER(ctypes.c_size_t),
+                            ctypes.POINTER(ctypes.POINTER(ctypes.c_size_t)),
+                            ctypes.POINTER(ctypes.POINTER(ctypes.c_size_t)),
+                            ctypes.POINTER(ctypes.c_int),
+                            ctypes.c_int,
+                            ctypes.POINTER(ctypes.c_int),
+                            ctypes.c_int]
 
-df_excel = pd.read_excel('Raw dataset/Tubacer instalation 2.xlsx', decimal=',')
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+import datetime as dt 
+import numpy as np
 
-df_treated = pd.read_excel('dados_espanha_xlsx.xlsx', sheet_name='All')
+TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
+TE = [
+      [0.176631, 0.170670, 0, 0, 0, 0.125919], 
+      [0.126656, 0.131860, 0, 0, 0, 0.092685], 
+      [0, 0.126656, 0.131860, 0, 0, 0.073864], # March is not in the invoices so the figures are based on february
+      [0, 0, 0, 0.066662, 0.079025, 0.073864], 
+      [0, 0, 0, 0.079119, 0.094265, 0.097955], 
+      [0, 0, 0.124591, 0.143611, 0, 0.138129], 
+      [0.150950, 0.179345, 0, 0, 0, 0.148744], 
+      [0, 0, 0.165865, 0.181045, 0, 0.169511], 
+      [0, 0, 0.145440, 0.167703, 0, 0.150691], 
+      [0, 0, 0, 0.137424, 0.169721, 0.133218], 
+      [0, 0.195679, 0.210640, 0, 0, 0.172424]
+      ]
 
-#%%
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 
 
-timeframe = (dt.datetime(2024, 8, 31, 23, 59), dt.datetime(2024, 9, 29, 23, 59))
-
-aug_excel = df_excel.loc[(df_excel['Date'] > timeframe[0]) & (df_excel['Date'] < timeframe[1])]
-
-aug_treated = df_treated.loc[(df_treated['DATE'] > timeframe[0]) & (df_treated['DATE'] < timeframe[1])]
-
-#%%
-
-sum_pv1 = df_csv['Einv_tot'].sum()
-sum_pv2 = aug_excel['Energía Total PV (kWh)'].sum()
-sum_pv_treated = aug_treated['TUBACER PV'].sum()
-
-sum_plant = df_csv['EcRST'].sum()
-sum_network = df_csv['EpRST'].sum()
-sum_plant_treated = aug_treated['TUBACER KWh'].sum()
-
-print('plant', sum_plant, 'plant treated', sum_plant_treated, 'network', sum_network, 'pv1', sum_pv1, 'pv2', sum_pv2, 'PV treated', sum_pv_treated)
-print('plant - network', sum_plant - sum_network)
-print()
-print('plant - 2 installations', sum_plant - sum_pv1 - sum_pv2) # I think we forgot the second installation
-print('plant - 1 installations', sum_plant - sum_pv1)
-print('plant_treated - PV treated', sum_plant_treated - sum_pv_treated)
-# -> but that does not explain why 
-
-#%%
-
-columns = df_csv.columns
-
-for col in columns : 
-    if df_csv[col].dtype == 'float64':
-        print(col, df_csv[col].sum())
+Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
+Nbdays += 1
+Econs = Econs[timerange[0]:timerange[1]+1]
+Eautocons = Eautocons[timerange[0]:timerange[1]+1]
+Pb = np.zeros(len(Econs))
+Cb = 0
+Pprev = np.zeros(6)
+Var_size = len(Pb) + 1 + len(Pprev)
+indexPb = [0, len(Pb)]
+indexCb = len(Pb)
+indexPprev = [indexCb+1, indexCb+1+len(Pprev)]
+deltat = 0.25
+tot_time = range(timerange[1]-timerange[0]+1)  
+for p in range(6) : 
+    for k in range(len(Time[p])) :
+        Time[p][k] -= timerange[0]
         
-#%% Recreate good data
-
-import os
-
-def time_dif(t1, t2) : 
-    return (int(t2.split(':')[1]) - int(t1.split(':')[1])) % 60
-
-new_data = 'new_data.csv'
-recap = 'monthly_recap.csv'
-
-csv_folder = 'Raw dataset/2_INV_INYECCION0'
-csvs = {}
-
-for file in os.listdir(csv_folder):
-    if file.endswith('csv') : 
-        try : 
-            month = int(file.split('_')[0])
-            csvs[month] = os.path.join(csv_folder, file)
-        except :
-            pass
-
-new_df = pd.DataFrame(columns=['date', 'Ec', 'Epv', 'Ec-Epv'])
-recap_df = pd.DataFrame(columns=['Month', 'Ec', 'Epv', 'Ec-Epv'])
-
-def combine_data(month, csv_file, df_excel, new_df) : 
-    if month > 1 : 
-        timeframe = (dt.datetime(2024, month-1, 31, 23, 59), dt.datetime(2024, month, 30, 23, 59))
-    elif month == 1 : 
-        timeframe = (dt.datetime(2023, 12, 31, 23, 59), dt.datetime(2024, 1, 30, 23, 59))
-    month_excel = df_excel.loc[(df_excel['Date'] > timeframe[0]) & (df_excel['Date'] < timeframe[1])]
-    csv = pd.read_csv(csvs[month], sep=';', decimal= ',')
+for month in range(12) : 
+    new = set()
+    while Time_in_month[month] : 
+        val = Time_in_month[month].pop()
+        val -= timerange[0]
+        new.add(val)
+    Time_in_month[month] = new.copy()    
     
-    Ecs_csv = []
-    Epvs_csv = []
-    Ecs_excel = []
-    Epvs_excel = []
-    # We will have 15 minutes sample, in the csv we have 10 minutes sample, in the excel we have 5 or 15.
-    # For the csv we will take 3 sample, and cut the one in the middle in two
-    for k in csv.index :  
-        if k % 3 == 0 : 
-            Ecs_csv.append(csv['EcRST'][k])
-            Epvs_csv.append(csv['Einv_tot'][k])
-        elif k % 3 == 1 : 
-            Ecs_csv[-1] += csv['EcRST'][k]/2
-            Epvs_csv[-1] += csv['Einv_tot'][k]/2
-            Ecs_csv.append(csv['EcRST'][k]/2)
-            Epvs_csv.append(csv['Einv_tot'][k]/2)
-        elif k % 3 == 2 : 
-            Ecs_csv[-1] += csv['EcRST'][k]
-            Epvs_csv[-1] += csv['Einv_tot'][k]
-    
-    # for k in month_excel.index :
-    #     if 
-    
-    
+time_month = [[[t for t in Time[p] if t in Time_in_month[month]] for p in range(6)] for month in range(12)]
+n_time_month = [[len(time_month[month][p]) for p in range(6)] for month in range(12)]
         
+charge_rate = 0.5 
+discharge_rate = 0.5
+Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen the losses if come from PV ? Maybe
+Effd = 0.95 # order of magnitude, need to be looked into.
+
+TB = 359
+TBm = 0.019
+batterie_life = 10
+months = range(1, 13)
+periods = range(6)
+
+Eprod = Eautocons
+SOC = [0 for k in range(len(Econs))]
+n_tot_time = len(tot_time)
+time = Time
+n_m = 12
+n_p = 6
+
+
+model = lib.init_model(Econs, Eprod, indexPb, deltat, charge_rate, discharge_rate, TE, TP, indexPprev, Nbdays, Kp, tep, indexCb, TB, batterie_life, TBm, SOC, tot_time, n_tot_time, time, time_month, n_time_month, months, n_m, periods,n_p)
+                        
