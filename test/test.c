@@ -1,12 +1,27 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+typedef struct {
+    int entier;
+    double reel;
+    size_t *tab1 ;
+    size_t **tab2 ;
+    size_t ***tab3 ;
+} lol ;
 
-int myFunction(int num)
-{
-    if (num == 0)
- 
-        // if number is 0, do not perform any operation.
-        return 0;
-    else
-        // if number is power of 2, return 1 else return 0
-          return ((num & (num - 1)) == 0 ? 1 : 0) ;
- 
+lol* init_lol(int num, double real, size_t *tab1, size_t **tab2, size_t ***tab3) {
+    lol *l = (lol*)malloc(sizeof(lol));
+    if (l == NULL) {
+        fprintf(stderr, "Failed to allocate memory for lol\n");
+        return NULL;
+    }
+    l->entier = num ;
+    l->reel = real ;
+    l->tab1 = tab1 ;
+    l->tab2 = tab2 ;
+    l->tab3 = tab3 ;
+    printf("tab3: %p\n", tab3);
+    return l ;
 }

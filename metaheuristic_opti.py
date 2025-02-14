@@ -10,10 +10,10 @@ import numpy.random as rd
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
-from representative_days import Econs_new, Eprod_new, full_date_new, days
+# from representative_days import Econs_new, Eprod_new, full_date_new, days
 
-Pcons_new = [val/0.25 for val in Econs_new]
-Pprod_new = [val/0.25 for val in Eprod_new]
+# Pcons_new = [val/0.25 for val in Econs_new]
+# Pprod_new = [val/0.25 for val in Eprod_new]
 
 Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
@@ -244,7 +244,7 @@ class GA :
                 self.best_indiv.copy_var(self.Pop[0])
                 self.best_indiv.fitness = self.best_indiv.detailed_obj(self.pl, self.pq)
             print()
-            print("Initialisation boucle : ", time()-tic)
+            # print("Initialisation boucle : ", time()-tic)
             
             print(c)
             print("last saved value", self.last_obj[-1])
@@ -253,22 +253,22 @@ class GA :
             # Selection
             tic = time()
             self.chosen_ones = self.selection_half_most_ranked()
-            print()
-            print('Selection : ', time()-tic)
+            # print()
+            # print('Selection : ', time()-tic)
             # Pairing
             tic = time()
             self.pairs = self.pairing(2)
-            print('Pairing : ', time() -tic)
+            # print('Pairing : ', time() -tic)
             # Crossover
             tic = time()
-            print()
+            # print()
             self.linear_random_crossover(self.fac)
-            print('Crossover : ', time() - tic)
+            # print('Crossover : ', time() - tic)
             # Mutation
             tic = time()
             self.random_mutation(self.mutation_rate, c)
-            print()
-            print('Mutation : ', time() - tic)
+            # print()
+            # print('Mutation : ', time() - tic)
             
             c +=1
 
@@ -351,14 +351,14 @@ class PSO:
         while c < self.nb_gen and not no_evolution(self.last_obj, self.threshold, self.nb_last_element) :
             sorted_indices = np.argsort([individual.fitness for individual in self.Pop])
             self.Pop = self.Pop[sorted_indices]
-            phig = (self.phi_max - self.phi_min)*c/nb_gen + self.phi_min
-            phip = (self.phi_min - self.phi_max)*c/nb_gen + self.phi_max
+            phig = (self.phi_max - self.phi_min)*c/self.nb_gen + self.phi_min
+            phip = (self.phi_min - self.phi_max)*c/self.nb_gen + self.phi_max
             w = ((1/2*(phig + phip) - 1) + 1)/2
             for k in range(self.nb_population) :
                 for var in self.Var : 
                     for j in self.var_len[var] :
                         rp, rg = rd.rand(), rd.rand()
-                        Vel = getattr(self.Pop[k], var__v)
+                        Vel = getattr(self.Pop[k], var+'__v')
                         Pos = getattr(self.Pop[k], var)
                         Best = getattr(self.Pop[k].best, var)
                         Vel[j] = w*Vel[j] + phig*rg*(getattr(self.best_indiv, var)[j] - Pos[j]) + phip*rp*(Best[j]-Pos[j])
@@ -440,8 +440,8 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
             
 if __name__ == '__main__' : 
     timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
-    # mod = build_model(timeframe)
-    mod = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new) 
+    mod = build_model(timeframe)
+    # mod = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new) 
     mod.set_bounds(['Pb', 'Cb', 'Pprev'], [-1000, 0, 0], [1000, 1000, 1000])
     
     import sys 

@@ -4,7 +4,7 @@
 #include <math.h>
 #include <time.h>
 
-#define PY_SSIZE_T_CLEAN
+// gcc -fPIC -shared -o libmodel.so meta.c
 
 typedef struct {
     size_t Var_size;
@@ -18,7 +18,7 @@ typedef struct {
     double *TP;
     int indexPprev[2];
     int Nbdays;
-    double Kp;
+    double *Kp;
     double tep;
     int indexCb ;
     double TB;
@@ -27,7 +27,6 @@ typedef struct {
     double *SOC; 
     size_t *tot_time;
     size_t n_tot_time;
-    size_t *time;
     size_t ***time_month;
     size_t **n_time_month;
     int *months;
@@ -36,34 +35,78 @@ typedef struct {
     int n_p;
 } Model;
 
-Model init_model(double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t *time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
-    Model model;
-    model.Econs = Econs;
-    model.Eprod = Eprod;
-    memcpy(model.indexPb, indexPb, 2 * sizeof(int));
-    model.deltat = deltat;
-    model.charge_rate = charge_rate;
-    model.discharge_rate = discharge_rate;
-    model.TE = TE;
-    model.TP = TP;
-    memcpy(model.indexPprev, indexPprev, 2 * sizeof(int));
-    model.Nbdays = Nbdays;
-    model.Kp = Kp;
-    model.tep = tep;
-    model.indexCb = indexCb;
-    model.TB = TB;
-    model.batterie_life = batterie_life;
-    model.TBm = TBm;
-    model.SOC = SOC;
-    model.tot_time = tot_time;
-    model.n_tot_time = n_tot_time;
-    model.time = time;
-    model.time_month = time_month;
-    model.n_time_month = n_time_month;
-    model.months = months;
-    model.n_m = n_m;
-    model.periods = periods;
-    model.n_p = n_p;
+Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
+    printf("Econs: %p, first value: %f\n", Econs, Econs[0]);
+    printf("Eprod: %p, first value: %f\n", Eprod, Eprod[0]);
+    printf("indexPb: %p, first value: %d\n", indexPb, indexPb[0]);
+    printf("TE: %p, first value: %f\n", TE, TE[0][0]);
+    printf("TP: %p, first value: %f\n", TP, TP[0]);
+    printf("indexPprev: %p, first value: %d\n", indexPprev, indexPprev[0]);
+    printf("Kp: %p, first value: %f\n", Kp, Kp[0]);
+    printf("SOC: %p, first value: %f\n", SOC, SOC[0]);
+    printf("tot_time: %p, first value: %zu\n", tot_time, tot_time[0]);
+    printf("time_month: %p, first value: %zu\n", time_month, time_month[0][0][0]);
+    printf("n_time_month: %p, first value: %zu\n", n_time_month, n_time_month[0][0]);
+    printf("months: %p, first value: %d\n", months, months[0]);
+    printf("periods: %p, first value: %d\n", periods, periods[0]);
+    
+    Model *model = (Model*)malloc(sizeof(Model));
+    if (model == NULL) {
+        fprintf(stderr, "Failed to allocate memory for model\n");
+        return NULL;
+    }
+    printf("Model\n");
+    model->Var_size = var_size;
+    model->Econs = Econs;
+    printf("Model Econs\n");
+    model->Eprod = Eprod;
+    printf("Model Eprod\n");
+    memcpy(model->indexPb, indexPb, 2 * sizeof(int));
+    printf("Model indexPb\n");
+    model->deltat = deltat;
+    printf("Model deltat\n");
+    model->charge_rate = charge_rate;
+    printf("Model charge_rate\n");
+    model->discharge_rate = discharge_rate;
+    printf("Model discharge_rate\n");
+    model->TE = TE;
+    printf("Model TE\n");
+    model->TP = TP;
+    printf("Model TP\n");
+    memcpy(model->indexPprev, indexPprev, 2 * sizeof(int));
+    printf("Model indexPprev\n");
+    model->Nbdays = Nbdays;
+    printf("Model Nbdays\n");
+    model->Kp = Kp;
+    printf("Model Kp\n");
+    model->tep = tep;
+    printf("Model tep\n");
+    model->indexCb = indexCb;
+    printf("Model indexCb\n");
+    model->TB = TB;
+    printf("Model TB\n");
+    model->batterie_life = batterie_life;
+    printf("Model batterie_life\n");
+    model->TBm = TBm;
+    printf("Model TBm\n");
+    model->SOC = SOC;
+    printf("Model SOC\n");
+    model->tot_time = tot_time;
+    printf("Model tot_time\n");
+    model->n_tot_time = n_tot_time;
+    printf("Model n_tot_time\n");
+    model->time_month = time_month;
+    printf("Model time_month\n");
+    model->n_time_month = n_time_month;
+    printf("Model n_time_month\n");
+    model->months = months;
+    printf("Model months\n");
+    model->n_m = n_m;
+    printf("Model n_m\n");
+    model->periods = periods;
+    printf("Model periods\n");
+    model->n_p = n_p;
+    printf("Model n_p\n");
     return model;
 }
 
@@ -74,7 +117,6 @@ void free_model(Model *model) {
     free(model->TP);
     free(model->SOC);
     free(model->tot_time);
-    free(model->time);
     for (int i = 0; i < model->n_m; i++) {
         for (int j = 0; j < model->n_p; j++) {
             free(model->time_month[i][j]);
@@ -117,7 +159,7 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     for (int month = 0; month < mod->n_m; month++) {
         for (int p = 0; p < mod->n_p; p++) {
             for (int t = 0; t < mod->n_time_month[month][p]; t++) {
-                if (Egrid > 0) {
+                if (Egrid[mod->time_month[month][p][t]] > 0) {
                     total += mod->TE[month][p] * Egrid[mod->time_month[month][p][t]];
                 }
             }
@@ -126,13 +168,15 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     for (int p = 0; p < mod->n_p; p++) {
         total += mod->TP[p] * Var[mod->indexPprev[0]+p] * mod->Nbdays;
         double st = 0;
-        for (int t = 0; t < mod->n_tot_time; t++) {
-            double val = Egrid[t] / mod->deltat - Var[mod->indexPprev[0]+p];
-            if (val > 0) {
-                st += val * val;
+        for (int month = 0; month < mod->n_m; month++) {
+            for (int t = 0; t < mod->n_time_month[month][p]; t++) {
+                double val = Egrid[mod->time_month[month][p][t]] / mod->deltat - Var[mod->indexPprev[0]+p];
+                if (val > 0) {
+                    st += val * val;
+                }
             }
         }
-        total += mod->Kp * mod->tep * sqrt(st);
+        total += mod->Kp[p] * mod->tep * sqrt(st);
     }
     total += Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365;
     
@@ -152,7 +196,7 @@ double obj(Model *mod, double *Var, double pl, double pq) {
         constraint_cost += penalty_bound_elem(Var[mod->indexPprev[0]+p], 0, Var[mod->indexPprev[0]+p+1], pl, pq);
     }
     }
-    return total;
+    return total+constraint_cost;
 }
 
 // We have the eqeuivalent of the model class in python.
@@ -168,19 +212,23 @@ typedef struct {
 
 
 
-void init_individual(Individual *ind, Model *model, double pl, double pq, double bounds[][2]) {
+void init_individual(Individual *ind, Model *model, double pl, double pq, double *bounds[2]) {
     ind->mod = model;
     ind->pl = pl;
     ind->pq = pq;
     ind->Var = malloc(model->Var_size * sizeof(double));
     ind->bounds = malloc(model->Var_size * sizeof(double[2]));
-
     srand(time(NULL));
     for (size_t i = 0; i < model->Var_size; i++) {
         ind->bounds[i][0] = bounds[i][0];
         ind->bounds[i][1] = bounds[i][1];
         ind->Var[i] = bounds[i][0] + ((double)rand() / RAND_MAX) * (bounds[i][1] - bounds[i][0]);
+        
+        // printf("Var_size: %zu\n", model->Var_size);
+        // printf("bounds: %f %f\n", bounds[i][0], bounds[i][1]);
+        // printf("Var[%zu]: %f\n", i, ind->Var[i]);
     }
+    
     ind->fitness = obj(ind->mod, ind->Var, ind->pl, ind->pq) ; 
 }
 
@@ -230,12 +278,23 @@ void shuffle(int *array, size_t n)
     }
 }
 
+// void linear_random_crossover(Individual *par1, Individual *par2, Individual *child1, Individual *child2, double fac) {
+//     double rd = (double)rand() / (double)RAND_MAX ;
+//     rd = rd*fac ;
+//     for (int i = 0; i < par1->mod->Var_size; i++) {
+//         child1->Var[i] = (1 + rd) * par2->Var[i] - rd * par1->Var[i];
+//         child2->Var[i] = (1 + rd) * par1->Var[i] - rd * par2->Var[i];
+//         child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
+//         child1->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
+//     }
+// }
+
 void linear_random_crossover(Individual *par1, Individual *par2, Individual *child1, Individual *child2, double fac) {
     double rd = (double)rand() / (double)RAND_MAX ;
     rd = rd*fac ;
     for (int i = 0; i < par1->mod->Var_size; i++) {
-        child1->Var[i] = (1 + rd) * par2->Var[i] - rd * par1->Var[i];
-        child2->Var[i] = (1 + rd) * par1->Var[i] - rd * par2->Var[i];
+        child1->Var[i] = (1 - rd) * par2->Var[i] + rd * par1->Var[i];
+        child2->Var[i] = (1 - rd) * par1->Var[i] + rd * par2->Var[i];
         child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
         child1->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
     }
@@ -258,7 +317,9 @@ void random_mutation(Individual *Pop, int nb_pop, double mutation_rate, int c, i
                 flag = 1 ; 
                 double lb = Pop[k].bounds[i][0] ; 
                 double ub = Pop[k].bounds[i][1] ;
-                double mut_fac = min_val + (1 - min_val) * (double)(nb_gen - c) / nb_gen ;
+                // double mut_fac = min_val + (1 - min_val) * (double)(nb_gen - c) / nb_gen ;
+                double mut_fac = min_val + (max_val - min_val) * (1 - exp(-0.25 * (double)c / nb_gen));
+                // double mut_fac = best_known/(ub-lb) ;
                 double mutation_value = generate_normal_random()*(ub - lb)/6*mut_fac ;
                 double mutated_var = Pop[k].Var[i] + mutation_value ; 
                 if (mutated_var > ub) mutated_var = ub ;
@@ -270,19 +331,27 @@ void random_mutation(Individual *Pop, int nb_pop, double mutation_rate, int c, i
     }
 }
 
-Individual GA(Model *mod, double opti_bounds[][2], int nb_pop, int nb_gen, double pl, double pq
-, double mutation_rate, int last_element, double threshold, int fac) {
+Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double pl, double pq
+, double mutation_rate, int last_element, double threshold, double fac, double min_mut, double max_mut) {
     Individual *Pop = malloc(nb_pop * sizeof(Individual));
     for (int i = 0; i < nb_pop; i++) {
         init_individual(&Pop[i], mod, pl, pq, opti_bounds);
     }
+    for (size_t i = 0; i < Pop[0].mod->Var_size; i++) {
+            printf(" Var[%zu]: %f", i, Pop[0].Var[i]);
+        }
+    printf("\nC etait les variables de 0\n");
     if (!(nb_pop/2 == (int) ((double) nb_pop/2.0))) nb_pop = nb_pop+1 ;
     int current_pop = nb_pop;
     double last_obj[nb_gen] ;
     int len = 0 ;
     Individual best_indiv ;
     init_individual(&best_indiv, mod, pl, pq, opti_bounds) ;
-    
+    // for (size_t i = 0; i < best_indiv.mod->Var_size; i++) {
+    //         printf(" Var[%zu]: %f", i, best_indiv.Var[i]);
+    //     }
+    // printf("\nC etait les variables de best_indiv\n");
+
     int chosen[nb_pop/2] ;
     for (int i = 0; i < nb_pop/2; i++) {
         chosen[i] = i ;
@@ -292,6 +361,7 @@ Individual GA(Model *mod, double opti_bounds[][2], int nb_pop, int nb_gen, doubl
 
     int c = 0 ;
     while (c < nb_gen && !(no_evolution(last_obj, threshold, last_element, len))) {
+
         sort_population(Pop, nb_pop) ;
         if (len == 0) {
             len += 1 ;
@@ -302,9 +372,15 @@ Individual GA(Model *mod, double opti_bounds[][2], int nb_pop, int nb_gen, doubl
             copy_var(&best_indiv, &Pop[0]) ;
             best_indiv.fitness = Pop[0].fitness ;
         }
+        printf("\n");
         printf("Generation %d:\n", c);
         printf("Best fitness: %f\n", Pop[0].fitness);
-        printf("Best individual variables:\n");
+        printf("Just to verify model Econs: %f\n", Pop[0].mod->Econs[0]);
+        // printf("Best individual variables: \n");
+        // for (size_t i = 0; i < Pop[0].mod->Var_size; i++) {
+        //     printf("Var[%zu]: %f", i, Pop[0].Var[i]);
+        // }
+        // printf("Best individual variables: \n");
         printf("\n");
 
         // Selection
@@ -326,7 +402,7 @@ Individual GA(Model *mod, double opti_bounds[][2], int nb_pop, int nb_gen, doubl
         }
 
         // Mutation
-        random_mutation(Pop, nb_pop, mutation_rate, c, nb_gen, 1.0/1000, 1.0/10) ;
+        random_mutation(Pop, nb_pop, mutation_rate, c, nb_gen, min_mut, max_mut) ;
         c += 1 ;
 
     }
@@ -339,4 +415,28 @@ int main() {
     // Take file named param.txt, on each line there is name ; value ; type ; 
     return 0;
 
+}
+
+Individual* run_comp(
+    double *opti_bounds[2], int nb_pop, int nb_gen, double pl, double pq, double mutation_rate, int last_element, double threshold, double fac, double min_mut, double max_mut,
+    size_t Var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, 
+    double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, 
+    double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, 
+    size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
+    
+    Model *model = init_model(Var_size, Econs, Eprod, indexPb, deltat, charge_rate, discharge_rate, TE, TP, indexPprev, Nbdays, Kp, tep, indexCb, TB, batterie_life, TBm, SOC, tot_time, n_tot_time, time_month, n_time_month, months, n_m, periods, n_p);
+    printf("Model Econs avant : %f\n", model->Econs[0]);
+    for (int i = 0; i < Var_size; i++) {
+        printf("opti_bounds[%d][0]: %f, opti_bounds[%d][1]: %f\n", i, opti_bounds[i][0], i, opti_bounds[i][1]);
+    }
+    Individual best_indiv = GA(model, opti_bounds, nb_pop, nb_gen, pl, pq, mutation_rate, last_element, threshold, fac, min_mut, max_mut);
+    printf("Model Econs après : %f\n", model->Econs[0]);
+    Individual *best_indiv_ptr = (Individual *)malloc(sizeof(Individual));
+    if (best_indiv_ptr == NULL) {
+        fprintf(stderr, "Failed to allocate memory for best_indiv_ptr\n");
+        return NULL;
+    }
+    *best_indiv_ptr = best_indiv;
+    // free_model(model);
+    return best_indiv_ptr;
 }

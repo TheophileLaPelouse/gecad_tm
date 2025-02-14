@@ -1,0 +1,7 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     libfun.so
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _init_lol, symObjAddr: 0x0, symBinAddr: 0x3E84, symSize: 0xD0 }
+  - { offsetInCU: 0xCC, offset: 0xCC, size: 0x8, addend: 0x0, symName: _init_lol, symObjAddr: 0x0, symBinAddr: 0x3E84, symSize: 0xD0 }
+...
