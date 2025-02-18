@@ -223,8 +223,9 @@ for coef in Pena2test :
 # -> Choix de coefficients dans les calculs = 0.000001 car représente 1/100000 fois la valeur donc on peut dire que c'est négligeable
 
 #%% Plot batterie usage 
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # model = build_model(timeframe, without_bat=True)
-# model = build_model(timeframe, pena=0.000001)
+model = build_model(timeframe, pena=0.000001)
 # full_date_new_simple = []
 # filled_days = set()
 # for date in full_date_new : 
@@ -238,7 +239,7 @@ for coef in Pena2test :
 
 # model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
 # model = build_model(full_date_new_simple, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new)  # N'a pas vraiment de sens mais c'est du test
-model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0.000001)
+# model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0.000001)
 
 #%% Bat_price influence 
 obj = []

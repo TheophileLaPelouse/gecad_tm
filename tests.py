@@ -80,8 +80,10 @@ Created on Thu Jan 16 10:47:46 2025
 #     return model;
 # }
 import ctypes
-
-lib = ctypes.CDLL('./libmodel.so')
+import pandas
+import os 
+path = os.path.join(os.path.dirname(__file__), 'C/libmodel.so')
+lib = ctypes.CDLL(path)
 lib.init_model.argtypes = [
     ctypes.c_size_t,
     ctypes.POINTER(ctypes.c_double),  # Econs
@@ -145,7 +147,8 @@ class Individual(ctypes.Structure):
     _fields_ = [
         ("mod", ctypes.POINTER(Model)),
         ("var", ctypes.POINTER(ctypes.c_double)),
-        ("fitness", ctypes.c_double)
+        ("fitness", ctypes.c_double), 
+        ("list_obj", ctypes.POINTER(ctypes.c_double))
     ]
 
 lib.init_model.restype = ctypes.POINTER(Model)    
@@ -171,8 +174,8 @@ TE = [
 
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
-
 
 Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
 timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
@@ -270,6 +273,7 @@ print('success1')
 
 
 lib.run_comp.argtypes = [
+    ctypes.c_int, # code
     ctypes.POINTER(ctypes.POINTER(ctypes.c_double)), # opti_bounds
     ctypes.c_int, # nb_pop
     ctypes.c_int, # nb_gen
@@ -309,7 +313,8 @@ lib.run_comp.argtypes = [
     ctypes.c_int # n_p
 ]
 
-lib.run_comp.restype = ctypes.POINTER(Individual)
+# lib.run_comp.restype = ctypes.POINTER(Individual)
+lib.run_comp.restype = ctypes.c_void_p
 #%%
 
 # Individual* run_comp(
@@ -346,7 +351,7 @@ mutation_rate = 0.2
 last_element = 10
 threshold = 1e-05
 fac = 1  
-args = [nb_pop, nb_gen, pl, pq, mutation_rate, last_element, threshold, fac, 1/1000, 1/10]
+args = [1, nb_pop, nb_gen, pl, pq, mutation_rate, last_element, threshold, fac, 1/1000, 1/10]
 
 for k in range(1, len(sys.argv)) : 
     args[k-1] = sys.argv[k]
@@ -354,17 +359,18 @@ for k in range(1, len(sys.argv)) :
 print(args)
     
 test = lib.run_comp(
+    int(args[0]),
     (ctypes.POINTER(ctypes.c_double)*Var_size) (*[(ctypes.c_double*2) (*opti_bounds[i]) for i in range(Var_size)]), 
-    int(args[0]), 
     int(args[1]), 
-    float(args[2]), 
-    float(args[3]),
-    float(args[4]), 
-    int(args[5]), 
-    float(args[6]),
+    int(args[2]), 
+    float(args[3]), 
+    float(args[4]),
+    float(args[5]), 
+    int(args[6]), 
     float(args[7]),
     float(args[8]),
     float(args[9]),
+    float(args[10]),
     Var_size, 
     (ctypes.c_double * len(Econs))(*Econs), 
     (ctypes.c_double * len(Eprod))(*Eprod), 
@@ -394,5 +400,14 @@ test = lib.run_comp(
 
 print(test)
 print("success2")                      
+
+if int(args[0]) == 1 :
+    print('Et du coup pourquoi on fait rien ici ?')
+    df = pandas.read_csv('results_c.dat', sep=' ') # It is too much to call pandas for this 
+    df['Fitness'].plot()
+
+    import matplotlib.pyplot as plt 
+    # plt.plot(to_plot)
+    plt.show()
 
 # python tests.py 100 100  0.01 0.01

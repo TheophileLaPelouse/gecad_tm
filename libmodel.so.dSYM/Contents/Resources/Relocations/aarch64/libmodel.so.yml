@@ -2,22 +2,22 @@
 triple:          'arm64-apple-darwin'
 binary-path:     libmodel.so
 relocations:
-  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _init_model, symObjAddr: 0x0, symBinAddr: 0x17D4, symSize: 0x58C }
-  - { offsetInCU: 0x251, offset: 0x251, size: 0x8, addend: 0x0, symName: _init_model, symObjAddr: 0x0, symBinAddr: 0x17D4, symSize: 0x58C }
-  - { offsetInCU: 0x3F7, offset: 0x3F7, size: 0x8, addend: 0x0, symName: _free_model, symObjAddr: 0x58C, symBinAddr: 0x1D60, symSize: 0x134 }
-  - { offsetInCU: 0x453, offset: 0x453, size: 0x8, addend: 0x0, symName: _penalty_bound_elem, symObjAddr: 0x6C0, symBinAddr: 0x1E94, symSize: 0xA4 }
-  - { offsetInCU: 0x4CF, offset: 0x4CF, size: 0x8, addend: 0x0, symName: _penalty_bound, symObjAddr: 0x764, symBinAddr: 0x1F38, symSize: 0x118 }
-  - { offsetInCU: 0x577, offset: 0x577, size: 0x8, addend: 0x0, symName: _obj, symObjAddr: 0x87C, symBinAddr: 0x2050, symSize: 0x6A8 }
-  - { offsetInCU: 0x727, offset: 0x727, size: 0x8, addend: 0x0, symName: _init_individual, symObjAddr: 0xF24, symBinAddr: 0x26F8, symSize: 0x19C }
-  - { offsetInCU: 0x79F, offset: 0x79F, size: 0x8, addend: 0x0, symName: _copy_var, symObjAddr: 0x10C0, symBinAddr: 0x2894, symSize: 0x70 }
-  - { offsetInCU: 0x7ED, offset: 0x7ED, size: 0x8, addend: 0x0, symName: _no_evolution, symObjAddr: 0x1130, symBinAddr: 0x2904, symSize: 0xCC }
-  - { offsetInCU: 0x85B, offset: 0x85B, size: 0x8, addend: 0x0, symName: _compare_indiv, symObjAddr: 0x11FC, symBinAddr: 0x29D0, symSize: 0x88 }
-  - { offsetInCU: 0x8AE, offset: 0x8AE, size: 0x8, addend: 0x0, symName: _sort_population, symObjAddr: 0x1284, symBinAddr: 0x2A58, symSize: 0x38 }
-  - { offsetInCU: 0x8E3, offset: 0x8E3, size: 0x8, addend: 0x0, symName: _shuffle, symObjAddr: 0x12BC, symBinAddr: 0x2A90, symSize: 0xE4 }
-  - { offsetInCU: 0x961, offset: 0x961, size: 0x8, addend: 0x0, symName: _linear_random_crossover, symObjAddr: 0x13A0, symBinAddr: 0x2B74, symSize: 0x174 }
-  - { offsetInCU: 0x9EF, offset: 0x9EF, size: 0x8, addend: 0x0, symName: _generate_normal_random, symObjAddr: 0x1514, symBinAddr: 0x2CE8, symSize: 0x8C }
-  - { offsetInCU: 0xA37, offset: 0xA37, size: 0x8, addend: 0x0, symName: _random_mutation, symObjAddr: 0x15A0, symBinAddr: 0x2D74, symSize: 0x2EC }
-  - { offsetInCU: 0xB86, offset: 0xB86, size: 0x8, addend: 0x0, symName: _GA, symObjAddr: 0x188C, symBinAddr: 0x3060, symSize: 0x6A4 }
-  - { offsetInCU: 0xDE6, offset: 0xDE6, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x1F30, symBinAddr: 0x3704, symSize: 0x34 }
-  - { offsetInCU: 0xE00, offset: 0xE00, size: 0x8, addend: 0x0, symName: _run_comp, symObjAddr: 0x1F64, symBinAddr: 0x3738, symSize: 0x348 }
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _init_model, symObjAddr: 0x0, symBinAddr: 0x11E4, symSize: 0x58C }
+  - { offsetInCU: 0x280, offset: 0x280, size: 0x8, addend: 0x0, symName: _init_model, symObjAddr: 0x0, symBinAddr: 0x11E4, symSize: 0x58C }
+  - { offsetInCU: 0x426, offset: 0x426, size: 0x8, addend: 0x0, symName: _free_model, symObjAddr: 0x58C, symBinAddr: 0x1770, symSize: 0x134 }
+  - { offsetInCU: 0x482, offset: 0x482, size: 0x8, addend: 0x0, symName: _penalty_bound_elem, symObjAddr: 0x6C0, symBinAddr: 0x18A4, symSize: 0xA4 }
+  - { offsetInCU: 0x4FE, offset: 0x4FE, size: 0x8, addend: 0x0, symName: _penalty_bound, symObjAddr: 0x764, symBinAddr: 0x1948, symSize: 0x118 }
+  - { offsetInCU: 0x5A6, offset: 0x5A6, size: 0x8, addend: 0x0, symName: _obj, symObjAddr: 0x87C, symBinAddr: 0x1A60, symSize: 0x6A8 }
+  - { offsetInCU: 0x756, offset: 0x756, size: 0x8, addend: 0x0, symName: _init_individual, symObjAddr: 0xF24, symBinAddr: 0x2108, symSize: 0x19C }
+  - { offsetInCU: 0x7CE, offset: 0x7CE, size: 0x8, addend: 0x0, symName: _copy_var, symObjAddr: 0x10C0, symBinAddr: 0x22A4, symSize: 0x70 }
+  - { offsetInCU: 0x81C, offset: 0x81C, size: 0x8, addend: 0x0, symName: _no_evolution, symObjAddr: 0x1130, symBinAddr: 0x2314, symSize: 0xCC }
+  - { offsetInCU: 0x88B, offset: 0x88B, size: 0x8, addend: 0x0, symName: _compare_indiv, symObjAddr: 0x11FC, symBinAddr: 0x23E0, symSize: 0x88 }
+  - { offsetInCU: 0x8E2, offset: 0x8E2, size: 0x8, addend: 0x0, symName: _sort_population, symObjAddr: 0x1284, symBinAddr: 0x2468, symSize: 0x38 }
+  - { offsetInCU: 0x917, offset: 0x917, size: 0x8, addend: 0x0, symName: _shuffle, symObjAddr: 0x12BC, symBinAddr: 0x24A0, symSize: 0xE4 }
+  - { offsetInCU: 0x995, offset: 0x995, size: 0x8, addend: 0x0, symName: _linear_random_crossover, symObjAddr: 0x13A0, symBinAddr: 0x2584, symSize: 0x174 }
+  - { offsetInCU: 0xA23, offset: 0xA23, size: 0x8, addend: 0x0, symName: _generate_normal_random, symObjAddr: 0x1514, symBinAddr: 0x26F8, symSize: 0x8C }
+  - { offsetInCU: 0xA6B, offset: 0xA6B, size: 0x8, addend: 0x0, symName: _random_mutation, symObjAddr: 0x15A0, symBinAddr: 0x2784, symSize: 0x2AC }
+  - { offsetInCU: 0xBAC, offset: 0xBAC, size: 0x8, addend: 0x0, symName: _GA, symObjAddr: 0x184C, symBinAddr: 0x2A30, symSize: 0x980 }
+  - { offsetInCU: 0xE6D, offset: 0xE6D, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x21CC, symBinAddr: 0x33B0, symSize: 0x34 }
+  - { offsetInCU: 0xE87, offset: 0xE87, size: 0x8, addend: 0x0, symName: _run_comp, symObjAddr: 0x2200, symBinAddr: 0x33E4, symSize: 0x510 }
 ...
