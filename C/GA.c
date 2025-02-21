@@ -243,6 +243,7 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
         printf("Generation %d:\n", c);
         printf("Best fitness: %f\n", Pop[0].fitness);
         printf("Just to verify model Econs: %f\n", Pop[0].mod->Econs[0]);
+        printf("Battery size %f\n", Pop[0].Var[Pop[0].mod->indexCb]);
         // printf("Best individual variables: \n");
         // for (size_t i = 0; i < Pop[0].mod->Var_size; i++) {
         //     printf("Var[%zu]: %f", i, Pop[0].Var[i]);

@@ -197,7 +197,7 @@ indexPprev = [indexCb+1, indexCb+1+len(Pprev)]
 opti_bounds = [[0, 0] for k in range(Var_size)]
 for k in range(*indexPb) : 
     opti_bounds[k] = [-1, 1]
-opti_bounds[indexCb] = [0.1, 1000]
+opti_bounds[indexCb] = [0.0001, 1000]
 for k in range(*indexPprev) : 
     opti_bounds[k] = [0, 500]
     
