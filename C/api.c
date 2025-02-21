@@ -16,11 +16,11 @@ void* run_comp(
     int code, 
     double *opti_bounds[2], int nb_pop, int nb_gen, double pl, double pq, double mutation_rate, int last_element, double threshold, double fac, double min_mut, double max_mut,
     size_t Var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, 
-    double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, 
+    double discharge_rate, double Effc, double Effd, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, 
     double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, 
     size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
     
-    Model *model = init_model(Var_size, Econs, Eprod, indexPb, deltat, charge_rate, discharge_rate, TE, TP, indexPprev, Nbdays, Kp, tep, indexCb, TB, batterie_life, TBm, SOC, tot_time, n_tot_time, time_month, n_time_month, months, n_m, periods, n_p);
+    Model *model = init_model(Var_size, Econs, Eprod, indexPb, deltat, charge_rate, discharge_rate, Effc, Effd, TE, TP, indexPprev, Nbdays, Kp, tep, indexCb, TB, batterie_life, TBm, SOC, tot_time, n_tot_time, time_month, n_time_month, months, n_m, periods, n_p);
     printf("Model Econs avant : %f\n", model->Econs[0]);
     for (int i = 0; i < Var_size; i++) {
         printf("opti_bounds[%d][0]: %f, opti_bounds[%d][1]: %f\n", i, opti_bounds[i][0], i, opti_bounds[i][1]);
@@ -45,6 +45,15 @@ void* run_comp(
     } else {
         fprintf(stderr, "Failed to open results_c.dat for writing\n");
     }
+    printf("Cb optimal: %f\n", best_indiv.Var[best_indiv.mod->indexCb]);
+    // for (int i = 0; i < model->indexPb[1] - model->indexPb[0]; i++) {
+    //     printf("Pb[%d]: %f\n", i, best_indiv.Var[model->indexPb[0] + i]);
+    // }
+    for (int i = 0; i < model->indexPprev[1] - model->indexPprev[0]; i++) {
+        printf("Pprev[%d]: %f\n", i, best_indiv.Var[model->indexPprev[0] + i]);
+    }
+    printf("fitness: %f\n", best_indiv.fitness);
+    obj(best_indiv.mod, best_indiv.Var, 1.000012, 0);
     return best_indiv_ptr;
     }
     if (code == 2) {
@@ -56,7 +65,27 @@ void* run_comp(
             fprintf(stderr, "Failed to allocate memory for best_indiv_ptr\n");
             return NULL;
         }
+
+        FILE *resultsFile = fopen("results_c.dat", "w");
+        if (resultsFile) {
+            fprintf(resultsFile, "Generation Fitness\n");
+            for (int i = 0; i < best_particle.len; i++) {
+                fprintf(resultsFile, "%d %f\n", i, best_particle.list_obj[i]);
+            }
+            fclose(resultsFile);
+        } else {
+            fprintf(stderr, "Failed to open results_c.dat for writing\n");
+        }
+
         *best_particle_ptr = best_particle;
+        obj(best_particle.mod, best_particle.Var, 1.000012, 0);
+        printf("Cb optimal: %f\n", best_particle.Var[best_particle.mod->indexCb]);
+        // for (int i = 0; i < model->indexPb[1] - model->indexPb[0]; i++) {
+        //     printf("Pb[%d]: %f\n", i, best_particle.Var[model->indexPb[0] + i]);
+        // }
+        for (int i = 0; i < model->indexPprev[1] - model->indexPprev[0]; i++) {
+            printf("Pprev[%d]: %f\n", i, best_particle.Var[model->indexPprev[0] + i]);
+        }
         return best_particle_ptr;
     }
     // free_model(model);

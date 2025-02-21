@@ -25,6 +25,14 @@ void init_individual(Individual *ind, Model *model, double pl, double pq, double
     ind->fitness = obj(ind->mod, ind->Var, ind->pl, ind->pq) ; 
 }
 
+void init_blank_indiv(Individual *ind, Model *model, double pl, double pq) {
+    ind->mod = model;
+    ind->pl = pl;
+    ind->pq = pq;
+    ind->Var = malloc(model->Var_size * sizeof(double));
+    ind->bounds = malloc(model->Var_size * sizeof(double[2]));
+}
+
 void copy_var(Individual *ind1, Individual *ind2) {
     for (size_t i =0 ; i < ind1->mod->Var_size ; i++) {
         ind1->Var[i] = ind2->Var[i] ;
@@ -61,12 +69,12 @@ void shuffle(int *array, size_t n)
 // void linear_random_crossover(Individual *par1, Individual *par2, Individual *child1, Individual *child2, double fac) {
 //     double rd = (double)rand() / (double)RAND_MAX ;
 //     rd = rd*fac ;
-//     for (int i = 0; i < par1->mod->Var_size; i++) {
+//     for (size_t i = 0; i < par1->mod->Var_size; i++) {
 //         child1->Var[i] = (1 + rd) * par2->Var[i] - rd * par1->Var[i];
 //         child2->Var[i] = (1 + rd) * par1->Var[i] - rd * par2->Var[i];
-//         child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
-//         child1->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
 //     }
+//     child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
+//     child2->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
 // }
 
 void linear_random_crossover(Individual *par1, Individual *par2, Individual *child1, Individual *child2, double fac) {
@@ -78,7 +86,73 @@ void linear_random_crossover(Individual *par1, Individual *par2, Individual *chi
         child2->Var[i] = (1 - rd) * par1->Var[i] + rd * par2->Var[i];
     }
     child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
-    child1->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
+    child2->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
+    if (child1->fitness > par1->fitness) {
+        copy_var(child1, par1) ;
+        child1->fitness = par1->fitness ;
+    }
+    if (child2->fitness > par2->fitness) {
+        copy_var(child2, par2) ;
+        child2->fitness = par2->fitness ;
+    }
+
+}
+
+void linear_random_crossover_2(Individual *par1, Individual *par2, double crossover_rate, double fac) {
+    if ((double)rand() / RAND_MAX < crossover_rate) {
+        Individual *child1 = malloc(sizeof(Individual));
+        Individual *child2 = malloc(sizeof(Individual));
+        init_blank_indiv(child1, par1->mod, par1->pl, par1->pq) ;
+        init_blank_indiv(child2, par2->mod, par2->pl, par2->pq) ;
+
+        double rd = (double)rand() / (double)RAND_MAX ;
+        rd = rd*fac ;
+        for (size_t i = 0; i < par1->mod->Var_size; i++) {
+        // printf("i: %d\n", i);
+            child1->Var[i] = (1 - rd) * par2->Var[i] + rd * par1->Var[i];
+            child2->Var[i] = (1 - rd) * par1->Var[i] + rd * par2->Var[i];
+        }
+        child1->fitness = obj(child1->mod, child1->Var, child1->pl, child1->pq) ;
+        child2->fitness = obj(child2->mod, child2->Var, child2->pl, child2->pq) ;
+        if (child1->fitness < par1->fitness) {
+            copy_var(par1, child1) ;
+            par1->fitness = child1->fitness ;
+        }
+        if (child2->fitness < par2->fitness) {
+            copy_var(par2, child2) ;
+            par2->fitness = child2->fitness ;
+        }
+    }
+}
+
+double* roulette_wheel_list(Individual *Pop, int nb_pop) {
+    double *cumulative_fitness = malloc(sizeof(double) * nb_pop);
+    double *probabilities = malloc(sizeof(double) * nb_pop);
+    double sum = 0;
+    for (int i = 0; i < nb_pop; i++) {
+        sum += 1/Pop[i].fitness;
+        cumulative_fitness[i] = sum;
+    }
+    for (int i = 0; i < nb_pop; i++) {
+        probabilities[i] = cumulative_fitness[i] / sum;
+    }
+    free(cumulative_fitness);
+    return probabilities;
+}
+
+int roulette_wheel(double *probabilities, int nb_pop) {
+    double rd = (double)rand() / RAND_MAX;
+    for (int i = 0; i < nb_pop; i++) {
+        if (rd < probabilities[i]) {
+            return i;
+        }
+    }
+    return nb_pop - 1;  // Should never reach this point
+}
+
+void wheel_selection(Individual *Pop, int nb_pop, double *probabilities, int* selected) {
+    selected[0] = roulette_wheel(probabilities, nb_pop);
+    selected[1] = roulette_wheel(probabilities, nb_pop);
 }
 
 void random_mutation(Individual *Pop, int nb_pop, double mutation_rate, int c, int nb_gen, double min_val, double max_val) {
@@ -96,7 +170,7 @@ void random_mutation(Individual *Pop, int nb_pop, double mutation_rate, int c, i
                 lb = Pop[k].bounds[i][0] ; 
                 ub = Pop[k].bounds[i][1] ;
                 // double mut_fac = min_val + (1 - min_val) * (double)(nb_gen - c) / nb_gen ;
-                mut_fac = min_val + (max_val - min_val) * (exp(-0.01 * (double)c));
+                mut_fac = min_val + (max_val - min_val) * (exp(-0.005 * (double)c));
                 // double mut_fac = best_known/(ub-lb) ;
                 mutation_value = generate_normal_random()*(ub - lb)/6*mut_fac ;
                 mutated_var = Pop[k].Var[i] + mutation_value ; 
@@ -137,6 +211,9 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
         chosen[i] = i ;
     }
     int pairs[nb_pop/2/2][2] ;
+    // int pairs[nb_pop/2][2] ;
+    int selected[2] ;
+
 
     clock_t start_time ;
     clock_t start_time2 ;
@@ -180,6 +257,12 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
             pairs[i][0] = chosen[2*i] ;
             pairs[i][1] = chosen[2*i+1] ;
         }
+        // double *probabilities = roulette_wheel_list(Pop, nb_pop);
+        // for (int i = 0 ; i < nb_pop/2 ; i++) {
+        //     wheel_selection(Pop, nb_pop, probabilities, selected);
+        //     pairs[i][0] = selected[0];
+        //     pairs[i][1] = selected[1];
+        // }
         end_time = clock();
         printf("Time shuffle and pairing: %f\n", (double)(end_time - start_time2) / CLOCKS_PER_SEC);
         start_time3 = clock();
@@ -193,6 +276,11 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
             current_pop += 2 ; 
             linear_random_crossover(&Pop[p1], &Pop[p2], &Pop[ch1], &Pop[ch2], fac) ;
         }
+        // for (int i=0 ; i <nb_pop/2 ; i++) {
+        //     int p1 = pairs[i][0] ;
+        //     int p2 = pairs[i][1] ;
+        //     linear_random_crossover_2(&Pop[p1], &Pop[p2], 0.5, fac) ;
+        // }
         end_time = clock();
         printf("Time crossover: %f\n", (double)(end_time - start_time3) / CLOCKS_PER_SEC);
         start_time4 = clock();
@@ -204,6 +292,9 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
         end_time = clock();
         printf("Time taken: %f\n", (double)(end_time - start_time) / CLOCKS_PER_SEC);
     }
+    copy_var(&best_indiv, &Pop[0]) ;
+    best_indiv.fitness = Pop[0].fitness ;
+    
     best_indiv.list_obj = malloc(len * sizeof(double));
     if (best_indiv.list_obj == NULL) {
         fprintf(stderr, "Failed to allocate memory for best_indiv.list_obj\n");
@@ -214,5 +305,11 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
         best_indiv.list_obj[i] = last_obj[i];
     }
     best_indiv.len = len;
+    free(last_obj);
+    for (int i = 0; i < nb_pop; i++) {
+        free(Pop[i].Var);
+        free(Pop[i].bounds);
+    }
+    free(Pop);
     return best_indiv ;
 }

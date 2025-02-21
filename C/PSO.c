@@ -3,7 +3,9 @@
 
 #include "meta.h"
 
+
 #endif // META_H
+#include </opt/homebrew/Cellar/libomp/19.1.7/include/omp.h>
 
 // For the moment test with the technique where inertia evolve with a gaussian
 void init_particle(Particle *part, Model *model, double pl, double pq, double *bounds[2]) {
@@ -117,28 +119,45 @@ Particle PSO(Model *model, double *bounds[2], int nb_pop, int nb_gen, double pl,
         printf("Best fitness: %f\n", best_indiv.fitness);
         printf("fitness of the first particle: %f\n", Pop[0].fitness);
         printf("fitness of the second particle: %f\n", Pop[1].fitness);
+        printf("current battery capacity: %f\n", Pop[0].Var[Pop[0].mod->indexCb]);
         printf("\n");
-        // global_wb = (2.5 - 0.5)*c/1000 + 0.5 ;
-        // global_wm = 0.5 - (2.5 - 0.5)*c/1000 ;
-        global_wb = 0.5 ;
-        global_wm = 2.5 ;
-        global_wp =  ((1/2*(global_wm + global_wb) - 1) + 1)/2;
+        if ((double)c/nb_gen < 0.25) {
+            global_wb = 2.5 ;
+            global_wm = 0.5 ;
+        }
+        else {
+            global_wb = (2.5 - 0.5)*(double)c/nb_gen + 0.5 ;
+            global_wm = 2.5 + (0.5 - 2.5)*(double)c/nb_gen ;
+        }
+        // global_wb = 0 ;
+        // global_wm = 2.5 ;
+        global_wp =  ((1.0/2.0*(global_wm + global_wb) - 1.0) + 1.0)/2.0;
+        // printf("global_wm: %f\n", global_wm);
+        // printf("global_wb: %f\n", global_wb);
+        // printf("global_wp: %f\n", global_wp);
+
+        last_obj[len] = best_indiv.fitness ;
+        len += 1 ;
+
         for (int k=0 ; k< nb_pop ; k++) {
-            // update_part_weight(&Pop[k]) ;
-            Pop[k].wm = global_wm ;
-            Pop[k].wb = global_wb ;
-            Pop[k].wp = global_wp ;
+            update_part_weight(&Pop[k]) ;
+            // Pop[k].wm = global_wm ;
+            // Pop[k].wb = global_wb ;
+            // Pop[k].wp = global_wp ;
+            // #pragma omp parallel for
             for (size_t i = 0; i < model->Var_size; i++) {
-                rm = (double)rand() / RAND_MAX ;
-                rb = (double)rand() / RAND_MAX ;
-                // rm =1;
-                // rb =1 ;
+                // rm = (double)rand() / RAND_MAX ;
+                // rb = (double)rand() / RAND_MAX ;
+                rm =1;
+                rb =1 ;
                 Pop[k].Speed[i] = Pop[k].wp * Pop[k].Speed[i] + Pop[k].wm * rm * (Pop[k].VarBest[i] - Pop[k].Var[i]) + Pop[k].wb * rb * (best_indiv.Var[i] - Pop[k].Var[i]) ;
                 Pop[k].Var[i] += Pop[k].Speed[i] ;
-                // if (Pop[k].Var[i] > Pop[k].bounds[i][1]) init_particle(&Pop[k], model, pl, pq, bounds) ;
-                // if (Pop[k].Var[i] < Pop[k].bounds[i][0]) init_particle(&Pop[k], model, pl, pq, bounds) ;
+                // printf("Var[%d]: %f, Speed : %f\n", i, Pop[k].Var[i], Pop[k].Speed[i]);
+                if (Pop[k].Var[i] > Pop[k].bounds[i][1]) Pop[k].Var[i] = Pop[k].bounds[i][1] ;
+                if (Pop[k].Var[i] < Pop[k].bounds[i][0]) Pop[k].Var[i] = Pop[k].bounds[i][0] ;
             }
             obj_val = obj(Pop[k].mod, Pop[k].Var, Pop[k].pl, Pop[k].pq) ;
+            // printf("obj_val %d: %f\n", k, obj_val);
             if (obj_val < Pop[k].fitness) {
                 Pop[k].fitness = obj_val ;
                 copy_var_p(&Pop[k], &Pop[k]) ;
@@ -150,6 +169,16 @@ Particle PSO(Model *model, double *bounds[2], int nb_pop, int nb_gen, double pl,
         }
         c += 1 ;
     }
+    best_indiv.list_obj = malloc(len * sizeof(double));
+    if (best_indiv.list_obj == NULL) {
+        fprintf(stderr, "Failed to allocate memory for best_indiv.list_obj\n");
+        return best_indiv;
+    }
+    for (int i = 0; i < len; i++) {
+        printf("last_obj[%d]: %f\n", i, last_obj[i]);
+        best_indiv.list_obj[i] = last_obj[i];
+    }
+    best_indiv.len = len;
     for (int i = 0; i < nb_pop; i++) {
         free(Pop[i].Var);
         free(Pop[i].Speed);

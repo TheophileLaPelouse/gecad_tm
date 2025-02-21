@@ -12,6 +12,8 @@ typedef struct {
     double deltat;
     double charge_rate;
     double discharge_rate;
+    double Effc ;
+    double Effd ;
     double **TE;
     double *TP;
     int indexPprev[2];
@@ -61,7 +63,7 @@ typedef struct {
 } Particle ;
 
 // Model functions
-Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) ;
+Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double Effc, double Effd, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) ;
 void free_model(Model *model) ;
 double obj(Model *mod, double *Var, double pl, double pq) ;
 double penalty_bound_elem(double x, double a, double b, double pl, double pq) ;

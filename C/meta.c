@@ -17,7 +17,7 @@ double generate_normal_random() {
 }
 
 
-Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
+Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2], double deltat, double charge_rate, double discharge_rate, double Effc, double Effd, double **TE, double *TP, int indexPprev[2], int Nbdays, double *Kp, double tep, int indexCb, double TB, double batterie_life, double TBm, double *SOC, size_t *tot_time, size_t n_tot_time, size_t ***time_month, size_t **n_time_month, int *months, int n_m, int *periods, int n_p) {
     printf("Econs: %p, first value: %f\n", Econs, Econs[0]);
     printf("Eprod: %p, first value: %f\n", Eprod, Eprod[0]);
     printf("indexPb: %p, first value: %d\n", indexPb, indexPb[0]);
@@ -50,6 +50,9 @@ Model* init_model(size_t var_size, double *Econs, double *Eprod, int indexPb[2],
     model->charge_rate = charge_rate;
     printf("Model charge_rate\n");
     model->discharge_rate = discharge_rate;
+    model->Effc = Effc;
+    printf("Model Effc %f\n", Effc);
+    model->Effd = Effd;
     printf("Model discharge_rate\n");
     model->TE = TE;
     printf("Model TE\n");
@@ -134,10 +137,15 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     for (size_t t = 0; t < mod->n_tot_time; t++) {
         Egrid[t] = mod->Econs[t] + 
             (
-                (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] - 
-                (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] / mod->discharge_rate
-            ) * mod->deltat
+                (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] + 
+                (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] * mod->discharge_rate
+            ) * mod->deltat * Var[mod->indexCb] 
+            - mod->Eprod[t]
             ;
+        // printf("Econs: %f, Eprod: %f, Ebat %f\n", mod->Econs[t], mod->Eprod[t], (
+        //         (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] + 
+        //         (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] * mod->discharge_rate
+        //     ) * mod->deltat * Var[mod->indexCb] );
     }
     // clock_t toc = clock();
     // printf("Time to calculate Egrid: %f\n", (double)(toc - tic) / CLOCKS_PER_SEC);
@@ -147,7 +155,12 @@ double obj(Model *mod, double *Var, double pl, double pq) {
             for (size_t t = 0; t < mod->n_time_month[month][p]; t++) {
                 if (Egrid[mod->time_month[month][p][t]] > 0) {
                     total += mod->TE[month][p] * Egrid[mod->time_month[month][p][t]];
+                    // printf("buying energy %f\n", mod->TE[month][p] * Egrid[mod->time_month[month][p][t]]);
                 }
+                // else {
+                //     total += mod->TE[month][p] * Egrid[mod->time_month[month][p][t]]/2;
+                //     // printf("selling energy %f\n", mod->TE[month][p] * Egrid[mod->time_month[month][p][t]]/2);
+                // }
             }
         }
     }
@@ -167,6 +180,7 @@ double obj(Model *mod, double *Var, double pl, double pq) {
         }
         total += mod->Kp[p] * mod->tep * sqrt(st);
     }
+    // printf("battery price %f\n", Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365);
     total += Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365;
     // toc = clock();
     // printf("Time to calculate total: %f\n", (double)(toc - tic) / CLOCKS_PER_SEC);
@@ -175,16 +189,25 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     double constraint_cost = 0; 
     mod->SOC[0] = Var[mod->indexCb]*0.2 ;
     for (size_t t =0; t<mod->n_tot_time-1 ; t++) {
-        mod->SOC[t+1] = Var[mod->indexPb[0]+t] * mod->deltat ;
+        mod->SOC[t+1] = mod->SOC[t-1] + (
+                (double) (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] * mod->Effc + 
+                (double) (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] * mod->discharge_rate / mod->Effd
+            ) * mod->deltat * Var[mod->indexCb] ;
         constraint_cost += penalty_bound_elem(mod->SOC[t+1], 
                                 0.2*Var[mod->indexCb], Var[mod->indexCb], pl, pq);
     }
-    constraint_cost += penalty_bound(Var, mod->indexPb, 
-                    -mod->discharge_rate*Var[mod->indexCb], 
-                    mod->charge_rate*Var[mod->indexCb], pl, pq) ; 
+    // constraint_cost += penalty_bound(Var, mod->indexPb, 
+    //                 -mod->discharge_rate*Var[mod->indexCb], 
+    //                 mod->charge_rate*Var[mod->indexCb], pl, pq) ; 
 
     for (int p =0 ; p<mod->n_p-1; p++) {
         constraint_cost += penalty_bound_elem(Var[mod->indexPprev[0]+p], 0, Var[mod->indexPprev[0]+p+1], pl, pq);
+    }
+    free(Egrid);
+    if (pl == 1.000012) {
+        printf("\nTotal: %f\n", total);
+        printf("Constraint cost: %f\n", constraint_cost);
+        printf("Total + constraint cost: %f\n\n", total+constraint_cost);
     }
     return total+constraint_cost;
 }

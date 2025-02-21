@@ -92,6 +92,8 @@ lib.init_model.argtypes = [
     ctypes.c_double,                  # deltat
     ctypes.c_double,                  # charge_rate
     ctypes.c_double,                  # discharge_rate
+    ctypes.c_double,                  # Effc
+    ctypes.c_double,                  # Effd
     ctypes.POINTER(ctypes.POINTER(ctypes.c_double)),  # TE
     ctypes.POINTER(ctypes.c_double),  # TP
     ctypes.POINTER(ctypes.c_int),     # indexPprev
@@ -122,6 +124,8 @@ class Model(ctypes.Structure):
         ("deltat", ctypes.c_double),
         ("charge_rate", ctypes.c_double),
         ("discharge_rate", ctypes.c_double),
+        ("effc", ctypes.c_double),
+        ("effd", ctypes.c_double),
         ("TE", ctypes.POINTER(ctypes.POINTER(ctypes.c_double))),
         ("TP", ctypes.POINTER(ctypes.c_double)),
         ("indexPprev", ctypes.c_int * 2),
@@ -173,10 +177,10 @@ TE = [
       ]
 
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
-# timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
-
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+# 
 Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
 timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
 Nbdays += 1
@@ -192,8 +196,8 @@ indexPprev = [indexCb+1, indexCb+1+len(Pprev)]
 
 opti_bounds = [[0, 0] for k in range(Var_size)]
 for k in range(*indexPb) : 
-    opti_bounds[k] = [-1000, 1000]
-opti_bounds[indexCb] = [0, 1000]
+    opti_bounds[k] = [-1, 1]
+opti_bounds[indexCb] = [0.1, 1000]
 for k in range(*indexPprev) : 
     opti_bounds[k] = [0, 500]
     
@@ -220,7 +224,9 @@ Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen t
 Effd = 0.95 # order of magnitude, need to be looked into.
 
 TB = 359
+TB = 0
 TBm = 0.019
+TBm = 0
 batterie_life = 10
 months = range(1, 13)
 periods = range(6)
@@ -247,8 +253,10 @@ model = lib.init_model(Var_size,
                         (ctypes.c_double * len(Eprod))(*Eprod), 
                         (ctypes.c_int * 2)(*indexPb), 
                         deltat,
-                        charge_rate, 
+                        charge_rate,
                         discharge_rate, 
+                        Effc, 
+                        Effd,
                         (ctypes.POINTER(ctypes.c_double) * len(TE))(*[ (ctypes.c_double * len(TE[i]))(*TE[i]) for i in range(len(TE))]), 
                         (ctypes.c_double * len(TP))(*TP),
                         (ctypes.c_int * 2)(*indexPprev),
@@ -292,6 +300,8 @@ lib.run_comp.argtypes = [
     ctypes.c_double, # deltat
     ctypes.c_double, # charge_rate
     ctypes.c_double, # discharge_rate
+    ctypes.c_double, # effc
+    ctypes.c_double, # effd
     ctypes.POINTER(ctypes.POINTER(ctypes.c_double)), # TE
     ctypes.POINTER(ctypes.c_double), # TP
     ctypes.POINTER(ctypes.c_int), # indexPprev
@@ -378,6 +388,8 @@ test = lib.run_comp(
     deltat,
     charge_rate, 
     discharge_rate, 
+    Effc, 
+    Effd,
     (ctypes.POINTER(ctypes.c_double) * len(TE))(*[ (ctypes.c_double * len(TE[i]))(*TE[i]) for i in range(len(TE))]), 
     (ctypes.c_double * len(TP))(*TP),
     (ctypes.c_int * 2)(*indexPprev),
@@ -401,7 +413,7 @@ test = lib.run_comp(
 print(test)
 print("success2")                      
 
-if int(args[0]) == 1 :
+if int(args[0]) == 1 or int(args[0]) == 2 :
     print('Et du coup pourquoi on fait rien ici ?')
     df = pandas.read_csv('results_c.dat', sep=' ') # It is too much to call pandas for this 
     df['Fitness'].plot()

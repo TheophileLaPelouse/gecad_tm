@@ -54,9 +54,10 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
             m = 0 
             while t not in Time_in_month[m] : 
                 m+=1
-            Se += TE[m][p]*(Econs[t]-Eautocons[t])
-            Se_p[p] += TE[m][p]*(Econs[t]-Eautocons[t])
-            Seauto += TEauto[p]*Eautocons[t]
+            # Se += TE[m][p]*(Econs[t]-Eautocons[t])
+            Se += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
+            Se_p[p] += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
+            # Seauto += TEauto[p]*Eautocons[t]
             Spena_P[p] += ((Pcons[t] - Pprev[p] + abs(Pcons[t] - Pprev[p]))/2)**2 
             
             # x+abs(x) = 2x if x>0, x+abs(x) = 0 if x < 0
@@ -318,6 +319,14 @@ def search_opti_wanted() :
     return Finals
         
     
+#%% Simple solve over the year 
+
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+model_year, Time_in_month, Nbdays_year = build_model(timeframe)
+solver = SolverFactory('ipopt')
+solver.options['print_timing_statistics'] = 'yes'
+results = solver.solve(model_year, tee=True)
+
 #%% Solver 
 TE_test = [[0 for k in range(6)] for i in range(11)]
 TE_test=TE 

@@ -48,7 +48,7 @@ Eprod_repr = series2lists(df['Eprod'])
 full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
 
 #%% Model construction
-def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
+def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, selling, opti = True) :
     Se = 0
     Seauto = 0
     Spena = 0
@@ -65,6 +65,8 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
             while t not in Time_in_month[m] : 
                 m+=1
             Se += TE[m][p]*model.Egrid_plus[t]
+            if selling :
+                Se -= TE[m][p]*model.Egrid_minus[t]/2
             # Se += TE[m][p]*model.Egrid_minus[t]
             # Seauto += TEauto[p]*(Eautocons[t]-Pc[t]*deltat)
             # Pgrid = (Egrid_plus[t]+Egrid_minus[t])/deltat
@@ -93,7 +95,7 @@ def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) :
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 
-def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019) :
+def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -185,7 +187,7 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
         model.no_bat = pyo.Constraint(expr=model.Cb==0)
     
     model.obj = pyo.Objective(expr=calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, 
-                                                   model.Time, model.tep, model.Kp, Nbdays, Time_in_month) 
+                                                   model.Time, model.tep, model.Kp, Nbdays, Time_in_month, selling) 
                               + battery_price(model.Cb, Nbdays, bat_price=bat_price)
                               + pena_charge_and_discharge(model.Pc, model.Pd, time=model.time, coef=pena)
                               , sense=pyo.minimize
@@ -224,6 +226,7 @@ for coef in Pena2test :
 
 #%% Plot batterie usage 
 timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
 # model = build_model(timeframe, without_bat=True)
 model = build_model(timeframe, pena=0.000001)
 # full_date_new_simple = []
@@ -239,7 +242,15 @@ model = build_model(timeframe, pena=0.000001)
 
 # model = build_model(full_date_new, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new) 
 # model = build_model(full_date_new_simple, definer=2, Econs=Econs_new, Eautocons=Eprod_new, Pcons=Pcons_new)  # N'a pas vraiment de sens mais c'est du test
-# model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0.000001)
+# model = build_model(full_date_repr, definer=2, Econs=Econs_repr, Eautocons=Eprod_repr, pena=0.000001, selling=False)
+
+#%% Simple test
+solver, results = solve(model)
+Pprev = [model.Pprev[k].value for k in range(6)]
+Pc = [model.Pc[k].value for k in model.time]
+Pd = [model.Pd[k].value for k in model.time]
+Cb = model.Cb.value
+
 
 #%% Bat_price influence 
 obj = []
