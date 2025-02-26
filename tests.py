@@ -178,7 +178,7 @@ TE = [
 
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
-# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 10, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
 # 
 Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -197,7 +197,8 @@ indexPprev = [indexCb+1, indexCb+1+len(Pprev)]
 opti_bounds = [[0, 0] for k in range(Var_size)]
 for k in range(*indexPb) : 
     opti_bounds[k] = [-1, 1]
-opti_bounds[indexCb] = [0.0001, 1000]
+opti_bounds[indexCb] = [68, 1000]
+# opti_bounds[indexCb] = [0, 0]
 for k in range(*indexPprev) : 
     opti_bounds[k] = [0, 500]
     
@@ -223,10 +224,10 @@ discharge_rate = 0.5
 Effc = 0.95 # Efficiency, we count the conversion losses, do we need to lessen the losses if come from PV ? Maybe
 Effd = 0.95 # order of magnitude, need to be looked into.
 
-TB = 359
 TB = 0
+# TB = 0
 TBm = 0.019
-TBm = 0
+# TBm = 0
 batterie_life = 10
 months = range(1, 13)
 periods = range(6)

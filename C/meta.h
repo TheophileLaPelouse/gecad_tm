@@ -68,6 +68,7 @@ void free_model(Model *model) ;
 double obj(Model *mod, double *Var, double pl, double pq) ;
 double penalty_bound_elem(double x, double a, double b, double pl, double pq) ;
 double penalty_bound(double *var, int *indices, double varlb, double varub, double pl, double pq) ;
+void init_feasible_var(double *Var, double *bounds[2], int *indPb, int *indPprev, int indCb, double charge_rate, double discharge_rate, double Effc, double Effd, double deltat);
 
 // GA functions
 Individual GA(Model *model, double *bounds[2], int nb_pop, int nb_gen, double pl, double pq, double mutation_rate, int last_element, double threshold, double fac, double min_mut, double max_mut) ;

@@ -21,7 +21,9 @@ void init_individual(Individual *ind, Model *model, double pl, double pq, double
         // printf("bounds: %f %f\n", bounds[i][0], bounds[i][1]);
         // printf("Var[%zu]: %f\n", i, ind->Var[i]);
     }
-    
+    // init_feasible_var(ind->Var, bounds, model->indexPb, model->indexPprev, model->indexCb, model->charge_rate, model->discharge_rate, model->Effc, model->Effd, model->deltat);
+    printf("Cb bounds: %f %f\n", ind->bounds[model->indexCb][0], ind->bounds[model->indexCb][1]);
+    printf("Cb value: %f\n", ind->Var[model->indexCb]);
     ind->fitness = obj(ind->mod, ind->Var, ind->pl, ind->pq) ; 
 }
 
@@ -122,12 +124,17 @@ void linear_random_crossover_2(Individual *par1, Individual *par2, double crosso
             copy_var(par2, child2) ;
             par2->fitness = child2->fitness ;
         }
+        free(child1->Var);
+        free(child1->bounds);
+        free(child1);
+        free(child2->Var);
+        free(child2->bounds);
+        free(child2);
     }
 }
 
-double* roulette_wheel_list(Individual *Pop, int nb_pop) {
+double* roulette_wheel_list(double *probabilities, Individual *Pop, int nb_pop) {
     double *cumulative_fitness = malloc(sizeof(double) * nb_pop);
-    double *probabilities = malloc(sizeof(double) * nb_pop);
     double sum = 0;
     for (int i = 0; i < nb_pop; i++) {
         sum += 1/Pop[i].fitness;
@@ -150,7 +157,7 @@ int roulette_wheel(double *probabilities, int nb_pop) {
     return nb_pop - 1;  // Should never reach this point
 }
 
-void wheel_selection(Individual *Pop, int nb_pop, double *probabilities, int* selected) {
+void wheel_selection(int nb_pop, double *probabilities, int* selected) {
     selected[0] = roulette_wheel(probabilities, nb_pop);
     selected[1] = roulette_wheel(probabilities, nb_pop);
 }
@@ -200,7 +207,7 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
     last_obj = malloc(nb_gen * sizeof(double));
     int len = 0 ;
     Individual best_indiv ;
-    init_individual(&best_indiv, mod, pl, pq, opti_bounds) ;
+    init_blank_indiv(&best_indiv, mod, pl, pq) ;
     // for (size_t i = 0; i < best_indiv.mod->Var_size; i++) {
     //         printf(" Var[%zu]: %f", i, best_indiv.Var[i]);
     //     }
@@ -213,6 +220,7 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
     int pairs[nb_pop/2/2][2] ;
     // int pairs[nb_pop/2][2] ;
     int selected[2] ;
+    double *probabilities = malloc(nb_pop * sizeof(double));
 
 
     clock_t start_time ;
@@ -244,6 +252,7 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
         printf("Best fitness: %f\n", Pop[0].fitness);
         printf("Just to verify model Econs: %f\n", Pop[0].mod->Econs[0]);
         printf("Battery size %f\n", Pop[0].Var[Pop[0].mod->indexCb]);
+        // obj(best_indiv.mod, best_indiv.Var, 1.000012, 0);
         // printf("Best individual variables: \n");
         // for (size_t i = 0; i < Pop[0].mod->Var_size; i++) {
         //     printf("Var[%zu]: %f", i, Pop[0].Var[i]);
@@ -258,9 +267,9 @@ Individual GA(Model *mod, double *opti_bounds[2], int nb_pop, int nb_gen, double
             pairs[i][0] = chosen[2*i] ;
             pairs[i][1] = chosen[2*i+1] ;
         }
-        // double *probabilities = roulette_wheel_list(Pop, nb_pop);
+        // roulette_wheel_list(probabilities, Pop, nb_pop);
         // for (int i = 0 ; i < nb_pop/2 ; i++) {
-        //     wheel_selection(Pop, nb_pop, probabilities, selected);
+        //     wheel_selection(nb_pop, probabilities, selected);
         //     pairs[i][0] = selected[0];
         //     pairs[i][1] = selected[1];
         // }

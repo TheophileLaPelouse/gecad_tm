@@ -10,7 +10,7 @@ import pandas as pd
 
 #%%
 from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists
-from representative_days import create_data, gen_new_data
+from representative_days import create_data, gen_new_data, separate_days
 
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
 TE = [
@@ -47,13 +47,22 @@ Econs_repr = series2lists(df['Econs'])
 Eprod_repr = series2lists(df['Eprod'])
 full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
 
+path_repr_div = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+if not os.path.exists(path_repr) :
+    raise ValueError('You must run opti.search_best_repr first')
+    
+df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
+Econs_repr_div = series2lists(df['Econs'])
+Eprod_repr_div = series2lists(df['Eprod'])
+full_date_repr_div = [df['full_date'][k] for k in range(len(df['full_date']))]
+
 #%% Model construction
-def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, selling, opti = True) :
+def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, selling, opti = True, printation=False) :
     Se = 0
     Seauto = 0
     Spena = 0
     Sp = 0
-    Spena_P = [0.00001 for k in range(6)]
+    Spena_P = [0.000000000001 for k in range(6)] # Should be different than 0 because of differentiation of the square root 
     for p in range(len(TP)) :
         Sp += TP[p]*model.Pprev[p]*Nbdays
         if opti :  
@@ -65,6 +74,8 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
             while t not in Time_in_month[m] : 
                 m+=1
             Se += TE[m][p]*model.Egrid_plus[t]
+            if printation :
+                print("Buying price", t, TE[m][p]*model.Egrid_plus[t]())
             if selling :
                 Se -= TE[m][p]*model.Egrid_minus[t]/2
             # Se += TE[m][p]*model.Egrid_minus[t]
@@ -73,9 +84,21 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
             # Pgrid = Pcons[t] - Pd[t] - Eautocons[t]/deltat + Pc[t]
             # Spena_P[p] += ((Pgrid - Pprev[p] + abs(Pgrid - Pprev[p]))/2)**2 
             Spena_P[p] += (model.Pplus[t, p])**2
+            
         Spena_P[p] = Spena_P[p]**(1/2)
         Spena += Kp[p]*tep*Spena_P[p]
-        
+        if printation :
+            if isinstance(Spena_P[p], float) : 
+                print("Spena_P", Spena_P[p])
+                print("Spena[p]", p, Kp[p]*tep*Spena_P[p])
+            else : 
+                print("Spena_P", Spena_P[p]())
+                print("Spena[p]", p, (Kp[p]*tep*Spena_P[p])())
+    if printation : 
+        print("Se", Se())
+        print("Seauto", Seauto)
+        print("Spena", Spena())
+        print("Sp", Sp())
     return Se + Seauto + Spena + Sp
 
 def battery_price(Cb, nbdays, bat_price=359/10+0.019) :
@@ -95,7 +118,7 @@ def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) :
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 
-def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False) :
+def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False, Cb_param=None) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -120,7 +143,10 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     model.Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     # model.notPc_Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.E = pyo.Var(model.time, domain=pyo.NonNegativeReals)
-    model.Cb = pyo.Var(domain = pyo.NonNegativeReals)
+    if Cb_param : 
+        model.Cb = pyo.Param(domain=pyo.NonNegativeReals, initialize=Cb_param)
+    else : 
+        model.Cb = pyo.Var(domain = pyo.NonNegativeReals)
     
     # For it to be linear
     model.Egrid_plus = pyo.Var(model.time, domain=pyo.NonNegativeReals)
@@ -149,7 +175,7 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     def max_rule(model, t) : 
         return model.E[t] <= model.Cb
     def min_rule(model, t) : 
-        return model.E[t] >= 0.2*model.Cb
+        return model.E[t] >= SOC0*model.Cb
     model.capacity_con_max = pyo.Constraint(model.time, rule=max_rule)
     model.capacity_con_min = pyo.Constraint(model.time, rule=min_rule)
     
@@ -171,7 +197,11 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     def Egrid_rule(model, t) : 
         return model.Egrid_plus[t] - model.Egrid_minus[t] == model.Econs[t] + (model.Pc[t]-model.Pd[t])*model.deltat - Eautocons[t]
     model.grid_con = pyo.Constraint(model.time, rule=Egrid_rule)
-
+    
+    def Egrid_mult_rule(model, t) : 
+        return model.Egrid_plus[t]*model.Egrid_minus[t] == 0
+    # model.grid_mult_con = pyo.Constraint(model.time, rule=Egrid_mult_rule)
+    
     model.Pminus = pyo.Var(model.time, model.period, domain=pyo.NonNegativeReals)
     model.Pplus = pyo.Var(model.time, model.period, domain=pyo.NonNegativeReals)
     
@@ -180,8 +210,13 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
     # = model.Egrid_plus[t]/model.deltat - model.Egrid_minus[t]/model.deltat - Pprev[p]
     model.grid_con_naive = pyo.Constraint(model.time, model.period, rule=Pgrid_rule_naive)
     
+    def Pgrid_mult_rule(model, t, p) :
+        return model.Pplus[t, p]*model.Pminus[t, p]==0
+    # model.Pgrid_con = pyo.Constraint(model.time, model.period, rule=Pgrid_mult_rule)
+    
     # def charge_discharge_rule(model, t) : 
-    #     return(model.notPc_Pd[t] == model.Pc*model.Pd[t])
+    #     return(model.Pc[t]*model.Pd[t]==0)
+    # model.notPC_Pd = pyo.Constraint(model.time, rule=charge_discharge_rule)
     
     if without_bat : 
         model.no_bat = pyo.Constraint(expr=model.Cb==0)
@@ -197,17 +232,18 @@ def build_model(timeframe, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0
 
 #%% Solver 
 
-def solve(model, print_level = 7) :
+def solve(model, print_level = 7, printation=True) :
     solver = SolverFactory('ipopt')
-    solver.options['print_level'] = print_level
-    solver.options['tol'] = 1e-4
-    solver.options['acceptable_tol'] = 1e-4
+    if printation :
+        solver.options['print_level'] = print_level
+        solver.options['print_timing_statistics'] = 'yes'
     solver.options['max_iter'] = 3000
-    solver.options['print_timing_statistics'] = 'yes'
+    # solver.options['tol'] = 1e-6
+    # solver.options['acceptable_tol'] = 1e-6
     solver.options['hsllib'] = '/usr/local/lib/libcoinhsl.dylib'
     # solver.options['nlp_scaling_method'] = 'none'
     solver.options['linear_solver'] = 'ma97'
-    results = solver.solve(model, tee=True)
+    results = solver.solve(model, tee=printation)
     return solver, results
 # model.display()
 
@@ -225,10 +261,11 @@ for coef in Pena2test :
 # -> Choix de coefficients dans les calculs = 0.000001 car représente 1/100000 fois la valeur donc on peut dire que c'est négligeable
 
 #%% Plot batterie usage 
-timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
-# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
 # model = build_model(timeframe, without_bat=True)
 model = build_model(timeframe, pena=0.000001)
+Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
 # full_date_new_simple = []
 # filled_days = set()
 # for date in full_date_new : 
@@ -250,6 +287,50 @@ Pprev = [model.Pprev[k].value for k in range(6)]
 Pc = [model.Pc[k].value for k in model.time]
 Pd = [model.Pd[k].value for k in model.time]
 Cb = model.Cb.value
+res = calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month, False, printation=True)
+
+#%% Using repr days part 1
+
+model = build_model(full_date_repr_div, definer=2, Econs=Econs_repr_div, Eautocons=Eprod_repr_div, pena=0.000001, selling=False)
+solver, results = solve(model, print_level=7)
+Cb=model.Cb.value
+Pprev = [model.Pprev[p].value for p in range(6)]
+#%% part 2
+Days = separate_days(Econs, Eautocons, full_date, delta=dt.timedelta(days=2, hours=23, minutes=59))
+# timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
+Pc = []
+Pd = []
+lastE = 0.2
+for k in range(0, len(Days)) : 
+    # Should be fast
+    print(k)
+    small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb)
+    solve(small, printation=False)
+    Pc += [small.Pc[i] for i in small.time]
+    Pd += [small.Pd[i] for i in small.time]
+    lastE = small.E[small.time.at(-1)]/Cb
+    
+
+#%% part 3
+timeframe = (full_date[0], full_date[-1])
+big = build_model(timeframe)
+for p in big.period : 
+    big.Pprev[p].value = model.Pprev[p].value
+
+big.Cb.value=Cb
+for t in big.time :
+    big.Pc[t].value = Pc[t]
+    big.Pd[t].value = Pd[t]
+    Egrid = big.Econs[t] + (big.Pc[t]-big.Pd[t])*big.deltat - Eautocons[t]
+    Egrid = Egrid()
+    big.Egrid_plus[t].value = Egrid*(Egrid>0)
+    big.Egrid_minus[t].value = -Egrid*(Egrid<0)
+    
+    for p in big.period : 
+        Pplus = (big.Econs[t]-Eautocons[t])/big.deltat  + (big.Pc[t]-big.Pd[t]) - big.Pprev[p]
+        Pplus = Pplus()
+        big.Pplus[t, p].value = Pplus*(Pplus>0)
+        big.Pminus[t, p].value = -Pplus*(Pplus<0)
 
 
 #%% Bat_price influence 

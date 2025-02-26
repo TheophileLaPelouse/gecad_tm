@@ -10,31 +10,38 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 #%%
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+from prices import define_time, gen_E, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists
 from representative_days import create_data, gen_new_data
+from prices_tubacer import TE, TE_new, TP, TP_new
 
-# Pcons_new = [val/0.25 for val in Econs_new]
-# Pprod_new = [val/0.25 for val in Eprod_new]
-
+Eautocons, Econs = gen_E['TUBACER']
 Pcons = [val/0.25 for val in Econs]
-TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
-TE = [
-      [0.176631, 0.170670, 0, 0, 0, 0.125919], 
-      [0.126656, 0.131860, 0, 0, 0, 0.092685], 
-      [0, 0.126656, 0.131860, 0, 0, 0.073864], # March is not in the invoices so the figures are based on february
-      [0, 0, 0, 0.066662, 0.079025, 0.073864], 
-      [0, 0, 0, 0.079119, 0.094265, 0.097955], 
-      [0, 0, 0.124591, 0.143611, 0, 0.138129], 
-      [0.150950, 0.179345, 0, 0, 0, 0.148744], 
-      [0, 0, 0.165865, 0.181045, 0, 0.169511], 
-      [0, 0, 0.145440, 0.167703, 0, 0.150691], 
-      [0, 0, 0, 0.137424, 0.169721, 0.133218], 
-      [0, 0.195679, 0.210640, 0, 0, 0.172424]
-      ]
+Pprod = [val/0.25 for val in Eautocons]
 
+
+#%% representative days 
+
+path_repr = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+if not os.path.exists(path_repr) :
+    raise ValueError('You must run opti.search_best_repr first')
+    
+df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
+
+Econs_repr = series2lists(df['Econs'])
+Eprod_repr = series2lists(df['Eprod'])
+full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
+
+path_repr_div = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+if not os.path.exists(path_repr) :
+    raise ValueError('You must run opti.search_best_repr first')
+    
+df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
+Econs_repr_div = series2lists(df['Econs'])
+Eprod_repr_div = series2lists(df['Eprod'])
+full_date_repr_div = [df['full_date'][k] for k in range(len(df['full_date']))]
 #%% Model construction
 
-def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True) :
+def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = True, printation=False, sep_pena=False) :
     # For it to be faster, we could rewrite this function in a C code and import it 
     # -> it should speed up the evaluation of the objective function
     # Here optimization is fast so not necessary
@@ -43,9 +50,10 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
     Spena = 0
     Sp = 0
     Se_p = [0 for k in range(6)]
-    Spena_P = [0.00001 for k in range(6)]
+    Spena_P = [[0.000000001 for k in range(6)] for i in range(12)]
     for p in range(len(TP)) :
         Sp += TP[p]*Pprev[p]*Nbdays
+        # print("power", TP[p], Pprev[p](), Nbdays, (TP[p]*Pprev[p]*Nbdays)())
         if opti :  
             time_table = Time[p].value 
         else :
@@ -58,18 +66,62 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
             Se += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
             Se_p[p] += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
             # Seauto += TEauto[p]*Eautocons[t]
-            Spena_P[p] += ((Pcons[t] - Pprev[p] + abs(Pcons[t] - Pprev[p]))/2)**2 
+            Spena_P[m][p] += ((Pcons[t]-Eautocons[t]*4 - Pprev[p] + abs(Pcons[t]-Eautocons[t]*4 - Pprev[p]))/2)**2 
             
             # x+abs(x) = 2x if x>0, x+abs(x) = 0 if x < 0
-        Spena_P[p] = Spena_P[p]**(1/2)
-        Spena += Kp[p]*tep*Spena_P[p]
+        # if printation :print("Spena_p", Kp[p], tep, (Spena_P[p])(), (Kp[p]*tep*Spena_P[p])())
+        for m in range(12) : 
+            Spena_P[m][p] = Spena_P[m][p]**(1/2)
+        Spena += Kp[p]*tep*sum(Spena_P[m][p] for m in range(12))
+    if printation : 
+        print("Se", Se)
+        print("Seauto", Seauto)
+        print("Spena", Spena())
+        print("Sp", Sp())
+    if sep_pena :
+        return (Se + Seauto + Spena + Sp), Spena
     return Se + Seauto + Spena + Sp
 
+def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, nb_repr, Time_in_month, opti = True, printation=False) :
+    Se = 0
+    Seauto = 0
+    Spena = 0
+    Sp = 0
+    Se_p = [0 for k in range(6)]
+    Spena_P = [[0.000000001 for k in range(6)] for i in range(12)]
+    for p in range(len(TP)) :
+        Sp += TP[p]*Pprev[p]*Nbdays
+        # print("power", TP[p], Pprev[p](), Nbdays, (TP[p]*Pprev[p]*Nbdays)())
+        if opti :  
+            time_table = Time[p].value 
+        else :
+            time_table = Time[p]
+        for t in time_table: 
+            m = 0 
+            while t not in Time_in_month[m] : 
+                m+=1
+            # Se += TE[m][p]*(Econs[t]-Eautocons[t])
+            Se += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2*nb_repr[t]
+            Se_p[p] += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2*nb_repr[t]
+            # Seauto += TEauto[p]*Eautocons[t]
+            Spena_P[m][p] += (((Pcons[t]-Eautocons[t]*4 - Pprev[p] + abs(Pcons[t]-Eautocons[t]*4 - Pprev[p]))/2)*nb_repr[t])**2 
+            
+            # x+abs(x) = 2x if x>0, x+abs(x) = 0 if x < 0
+        for m in range(12) : 
+            Spena_P[m][p] = Spena_P[m][p]**(1/2)
+        if printation :print("Spena_p", Kp[p], tep, (Spena_P[p])(), (Kp[p]*tep*Spena_P[p])())
+        Spena += Kp[p]*tep*sum(Spena_P[m][p] for m in range(12))
+    if printation : 
+        print("Se", Se)
+        print("Seauto", Seauto)
+        print("Spena", Spena())
+        print("Sp", Sp())
+    return Se + Seauto + Spena + Sp
 
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe =(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 1, 30, 23, 59))
-def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours) :
+def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, biased=False, nb_repr=[], Nbdays_forced=None) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -80,14 +132,16 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
         timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
     else : 
         raise ValueError("definer must be 1 or 2")
-    
+        
+    if Nbdays_forced : 
+        Nbdays = Nbdays_forced
     model = pyo.ConcreteModel()
     
     model.period = pyo.RangeSet(0, len(TP)-1)
     model.month = pyo.RangeSet(0, 10)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
-    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 130, 130, 130, 130, 190])
+    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 130, 130, 130, 130, 195])
     # model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
     
     model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
@@ -101,7 +155,11 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     model.Kp = pyo.Param(model.period, initialize={p : Kp[p] for p in model.period})
     
     # model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.P_minus_P, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays))
-    model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month))
+    if biased and nb_repr: 
+        model.obj = pyo.Objective(expr=biased_prices(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, nb_repr, Time_in_month))
+    else :    
+        if biased : print("You forgot the nb_repr list")
+        model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month))
     
     def Pprev_rule(model, p) : 
         if p == model.period.last() :
@@ -317,15 +375,63 @@ def search_opti_wanted() :
         c += 1
         print(50-5*c)
     return Finals
+
+def new_test(wanted=50, path="Results/csv/best_repr_div.csv") :
+    timeframe=(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 11, 0, 1))
+    def gen_random_cliped(before) : 
+        r = 200*(rand()+0.2)
+        if r < before : 
+            return before 
+        return r
         
+    Pprev = [[0, 0, 0, 0, 0, 0] for k in range(20)]
+    for k in range(20) :
+        for p in range(6) : 
+            if p == 0 :
+                Pprev[k][p] = gen_random_cliped(0)
+            else :
+                Pprev[k][p] = gen_random_cliped(Pprev[k][p-1])
+                
+    model_year, _, Nbdays_year = build_model(timeframe)
+    scores = []
+    min_score = 1
+    for k in range(1) : 
+        Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr = create_data(method="quantile", n_init=1, nb_days=35, forced_timeframe=timeframe, wanted=wanted)
+        model, _, Nbdays = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        current = []
+        
+        for i in range(20) : 
+            for p in range(6) : 
+                model.Pprev[p].value = Pprev[i][p]
+                model_year.Pprev[p].value = Pprev[i][p]
+            obj_year = model_year.obj()
+            obj = model.obj()
+            obj = obj*Nbdays_year/Nbdays
+            current.append(abs(obj-obj_year)/obj_year)
+        current_score = sum(current)/len(current)
+        if current_score < min_score : 
+            Econs_min, Eprod_min, full_date_min, days_min = Econs_new3[:], Eprod_new3[:], full_date_new3[:], days3[:]
+        scores.append(sum(current)/len(current))
+        
+    df = pd.DataFrame(columns=['Econs', 'Eprod', 'full_date'], index=range(len(Econs_min)))
+    df['Econs'] = Econs_min
+    df['Eprod'] = Eprod_min
+    df['full_date'] = full_date_min
+    df.to_csv(path, sep=';', index=False)
+    return scores
+
     
 #%% Simple solve over the year 
 
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
-model_year, Time_in_month, Nbdays_year = build_model(timeframe)
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+model_year, Time_in_month, Nbdays_year = build_model(timeframe, TE=TE_new, TP=TP_new)
+res0 = model_year.obj()
 solver = SolverFactory('ipopt')
 solver.options['print_timing_statistics'] = 'yes'
 results = solver.solve(model_year, tee=True)
+Pprev = [model_year.Pprev[k].value for k in range(6)]
+res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, printation=True)
 
 #%% Solver 
 TE_test = [[0 for k in range(6)] for i in range(11)]
@@ -335,7 +441,7 @@ timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
 Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=0)
 Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="year", n_init=1, forced_timeframe=timeframe, nb_days=36)
 
-model_year, Time_in_month, Nbdays_year = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test, TE=TE_test)
+model_year, Time_in_month, Nbdays_year = build_model(timeframe, Econs=Econs_test, Eautocons=Eprod_test, TE=TE_new, TP=TP_new)
 # model = model_year
 model, Time_in_month, Nbdays = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2, TE=TE_test)
 noopti = model.obj()
@@ -355,11 +461,27 @@ On veut récupérer le résultat d'optimisation donc les valeurs de Pprev, On ve
 et on veut un récapitulatif mois par mois, avec total conso, total prod, prix, et comparaison avec le prix actuel 
 """
 
-opti = [model.Pprev[p].value for p in model.period]
-original = [120, 120, 120, 120, 120, 190]
-price = model.obj()
+model, Time_in_month, Nbdays_year = build_model(full_date, definer=2, TE=TE_new, TP=TP_new)
+solver = SolverFactory('ipopt')
+# solver.options['print_timing_statistics'] = 'yes'
 
-original_price = calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, model.Time, tep, Kp, Nbdays, Time_in_month, opti = True)
+
+
+original = [120, 130, 130, 130, 130, 195]
+for p in range(6) : 
+    model.Pprev[p].value = original[p]
+original_price = model.obj()
+
+res, pena = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, printation=True, sep_pena=True)
+
+pena_ori = pena()
+results = solver.solve(model, tee=True)
+
+res, pena = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, printation=True, sep_pena=True)
+pena_opti=pena()
+
+opti = [model.Pprev[p].value for p in model.period]
+price = model.obj()
 decrease = (original_price - price)/original_price
 
 def last_day(any_day):
@@ -376,16 +498,28 @@ Opti = []
 Conso = []
 Prod = []
 Compare = []
-results = pd.DataFrame(columns=['Month', 'Original', 'Optimized', 'Consumption', 'Production'])
+Pena_original =[]
+Pena_opti = []
+results = pd.DataFrame(columns=['Month', 'Original', 'Optimized', 'Pena_origin', 'Pena_opti', 'Consumption', 'Production'])
 
 for month in months :
     Tframe[month] = (dt.datetime(2024, month, 1, 0, 0), last_day(dt.datetime(2024, month, 1, 0, 0)))
-    Time, Nbdays, Time_in_month = define_time(Tframe[month], period_hours)
+    small, Time_in_month, Nbdays= build_model(Tframe[month], TE=TE_new, TP=TP_new)
     Nbdays += 1
-    Opti.append(calculate_price(opti, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = False))
-    Origin.append(calculate_price(original, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, opti = False))
-    Conso.append(sum([sum(Econs[t] for t in T) for T in Time]))
-    Prod.append(sum([sum(Eautocons[t] for t in T) for T in Time]))
+    for p in range(6) : 
+        small.Pprev[p].value = original[p]
+    print("\nMonth %d original" % month)
+    res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays_year, Time_in_month, printation=True, sep_pena=True)
+    Origin.append(small.obj())
+    Pena_original.append(pena())
+    for p in range(6) : 
+        small.Pprev[p].value = opti[p]
+    print("\nMonth %d opti" % month)
+    res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays_year, Time_in_month, printation=True, sep_pena=True)
+    Opti.append(small.obj())
+    Pena_opti.append(pena())
+    Conso.append(sum([Econs[t] for t in Time_in_month[month]]))
+    Prod.append(sum([Eautocons[t] for t in Time_in_month[month]]))
     Compare.append((Origin[-1] - Opti[-1])/Origin[-1])
 
 results['Month'] = [cal.month_name[month] for month in months]
@@ -394,6 +528,8 @@ results['Optimized'] = Opti
 results['Consumption'] = Conso
 results['Production'] = Prod
 results['Compare'] = Compare
+results['Pena_origin'] = Pena_original
+results['Pena_opti'] = Pena_opti
 results.loc['Total'] = results.sum(numeric_only=True)
 results.loc['Total', 'Month'] = 'Total'
 results.loc['Total', 'Compare'] = (results.loc['Total', 'Original'] - results.loc['Total', 'Optimized'])/results.loc['Total', 'Original']
@@ -405,9 +541,11 @@ if not os.path.exists(os.path.join(os.path.dirname(__file__), 'Results')) :
 if not os.path.exists(os.path.join(os.path.dirname(__file__), 'Results/csv')) :
     os.mkdir(os.path.join(os.path.dirname(__file__), 'Results/csv'))
     
-results = results.round(2)
+results = results.round(3)
 
 results.to_csv(csv_path, sep=';', index=False)
+
+
 
 #%% Verification 
 
@@ -434,3 +572,51 @@ for month in months :
         
 print(Time == Time_reconstructed)
         
+#%% Representative tests
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 11, 0, 1))
+nb_days = 100
+# timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 2, 1, 0, 1))
+# nb_days = 5
+Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr = create_data(method="year_barycenter", n_init=1, nb_days=nb_days, forced_timeframe=timeframe, wanted=50)
+
+nb_repr_t = [None for k in range(len(full_date_new3))]
+k = 0
+date0 = days3[0]
+for t in range(len(full_date_new3)) : 
+    if full_date_new3[t].date() == date0 :
+        nb_repr_t[t] = nb_repr[k]
+    else : 
+        print(t, k)
+        nb_repr_t[t] = nb_repr[k]
+        k += 1
+        try : date0 = days3[k]
+        except : break
+        
+model, _, Nbdays = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3, biased=True, nb_repr=nb_repr_t)
+        
+# solver = SolverFactory('ipopt')
+# solver.options['print_timing_statistics'] = 'yes'
+# results = solver.solve(model, tee=True)
+timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
+# timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+model_year, Time_in_month, Nbdays_year = build_model(timeframe)
+solver = SolverFactory('ipopt')
+solver.options['print_timing_statistics'] = 'yes'
+results = solver.solve(model_year, tee=True)
+Pprev = [model_year.Pprev[k].value for k in range(6)]
+res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, printation=True)
+
+
+for p in range(6) : 
+    model.Pprev[p].value = Pprev[p]
+    
+#%% Biased test
+nb_repr = []
+for k in range(len(Econs_repr_div)) : 
+    nb_repr.append(6)
+model, _, Nbdays = build_model(full_date_repr_div, definer=2, Econs=Econs_repr_div, Eautocons=Eprod_repr_div, biased=True, nb_repr=nb_repr)
+
+    
+solver = SolverFactory('ipopt')
+solver.options['print_level'] = 7
+results = solver.solve(model, tee=True)

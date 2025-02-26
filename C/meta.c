@@ -137,8 +137,8 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     for (size_t t = 0; t < mod->n_tot_time; t++) {
         Egrid[t] = mod->Econs[t] + 
             (
-                (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] + 
-                (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] * mod->discharge_rate
+                (Var[mod->indexPb[0]+t] > 0) * Var[mod->indexPb[0]+t] + 
+                (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t]
             ) * mod->deltat * Var[mod->indexCb] 
             - mod->Eprod[t]
             ;
@@ -150,11 +150,12 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     // clock_t toc = clock();
     // printf("Time to calculate Egrid: %f\n", (double)(toc - tic) / CLOCKS_PER_SEC);
     // tic = clock();
+    double Egrid_price = 0;
     for (int month = 0; month < mod->n_m; month++) {
         for (int p = 0; p < mod->n_p; p++) {
             for (size_t t = 0; t < mod->n_time_month[month][p]; t++) {
                 if (Egrid[mod->time_month[month][p][t]] > 0) {
-                    total += mod->TE[month][p] * Egrid[mod->time_month[month][p][t]];
+                    Egrid_price += mod->TE[month][p] * Egrid[mod->time_month[month][p][t]];
                     // printf("buying energy %f\n", mod->TE[month][p] * Egrid[mod->time_month[month][p][t]]);
                 }
                 // else {
@@ -164,11 +165,15 @@ double obj(Model *mod, double *Var, double pl, double pq) {
             }
         }
     }
+    total += Egrid_price;
     // toc = clock();
     // printf("Time to calculate total: %f\n", (double)(toc - tic) / CLOCKS_PER_SEC);
     // tic = clock();
+    double power_price = 0;
+    double excess = 0;
     for (int p = 0; p < mod->n_p; p++) {
-        total += mod->TP[p] * Var[mod->indexPprev[0]+p] * mod->Nbdays;
+        power_price += mod->TP[p] * Var[mod->indexPprev[0]+p] * mod->Nbdays;
+        // printf("power %f\n", mod->TP[p] * Var[mod->indexPprev[0]+p] * mod->Nbdays);
         double st = 0;
         for (int month = 0; month < mod->n_m; month++) {
             for (size_t t = 0; t < mod->n_time_month[month][p]; t++) {
@@ -178,10 +183,18 @@ double obj(Model *mod, double *Var, double pl, double pq) {
                 }
             }
         }
-        total += mod->Kp[p] * mod->tep * sqrt(st);
+        // if (pl == 1.000012) printf("excess power p %d %f %f %f %f\n", p, mod->Kp[p],  mod->tep, sqrt(st), mod->Kp[p]*mod->tep*sqrt(st));
+        // printf("excess power %f\n", mod->Kp[p] * mod->tep * sqrt(st));
+        // total += power_price ;
+        // total += mod->Kp[p] * mod->tep * sqrt(st);
+        excess += mod->Kp[p] * mod->tep * sqrt(st) ;
     }
+    total += excess;
+    total += power_price;
     // printf("battery price %f\n", Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365);
-    total += Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365;
+    // if (pl == 1.000012) printf("Cb %f, TB %f, batterie_life %f, TBm %f, Nbdays %d\n", Var[mod->indexCb], mod->TB, mod->batterie_life, mod->TBm, mod->Nbdays);
+    double bat_price = Var[mod->indexCb] * (mod->TB / mod->batterie_life + mod->TBm) * mod->Nbdays / 365;
+    total += bat_price;
     // toc = clock();
     // printf("Time to calculate total: %f\n", (double)(toc - tic) / CLOCKS_PER_SEC);
     // tic = clock();
@@ -189,13 +202,15 @@ double obj(Model *mod, double *Var, double pl, double pq) {
     double constraint_cost = 0; 
     mod->SOC[0] = Var[mod->indexCb]*0.2 ;
     for (size_t t =0; t<mod->n_tot_time-1 ; t++) {
-        mod->SOC[t+1] = mod->SOC[t-1] + (
+        mod->SOC[t+1] = mod->SOC[t] + (
                 (double) (Var[mod->indexPb[0]+t] > 0) * mod->charge_rate * Var[mod->indexPb[0]+t] * mod->Effc + 
                 (double) (Var[mod->indexPb[0]+t] < 0) * Var[mod->indexPb[0]+t] * mod->discharge_rate / mod->Effd
             ) * mod->deltat * Var[mod->indexCb] ;
         constraint_cost += penalty_bound_elem(mod->SOC[t+1], 
                                 0.2*Var[mod->indexCb], Var[mod->indexCb], pl, pq);
+        // if (pl == 1.000012) printf("SOC: %f\n", mod->SOC[t+1]);
     }
+    // if (pl == 1.000012) printf("Cb: %f\n", Var[mod->indexCb]);
     // constraint_cost += penalty_bound(Var, mod->indexPb, 
     //                 -mod->discharge_rate*Var[mod->indexCb], 
     //                 mod->charge_rate*Var[mod->indexCb], pl, pq) ; 
@@ -208,6 +223,10 @@ double obj(Model *mod, double *Var, double pl, double pq) {
         printf("\nTotal: %f\n", total);
         printf("Constraint cost: %f\n", constraint_cost);
         printf("Total + constraint cost: %f\n\n", total+constraint_cost);
+        printf("Excess: %f\n", excess);
+        printf("Power price: %f\n", power_price);
+        printf("Egrid price: %f\n", Egrid_price);
+        printf("bat_price: %f\n", bat_price);
     }
     return total+constraint_cost;
 }
@@ -215,7 +234,51 @@ double obj(Model *mod, double *Var, double pl, double pq) {
 // We have the eqeuivalent of the model class in python.
 
 
-
+void init_feasible_var(double *Var, double *bounds[2], int *indPb, int *indPprev, int indCb, double charge_rate, double discharge_rate, double Effc, double Effd, double deltat) {
+    // Init the Pb variables 
+    // We need a random feasible solution
+    // The idea will be to begin at 0.2 of the battery capacity
+    // and then generate random values that will be feasible regarding to the SOC
+    // and the power constraints
+    double Cb = Var[indCb];
+    int ind = indPb[0];
+    double SOC = 0.2 * Cb;
+    double rd ;
+    double E_t ;
+    for (int i = ind; i < indPb[1]; i++) {
+        rd = ((double) rand() / RAND_MAX - 0.5)*2.0;
+        // printf("SOC(t-1) %f rd: %f\n", SOC, rd);
+        if (rd >= 0) {
+            E_t = rd * charge_rate * Cb * Effc * deltat;
+            if (SOC + E_t > Cb) {
+                Var[i] = (Cb - SOC) / (charge_rate * Effc * deltat * Cb);
+                // printf("Var[i] result %f, num : %f, denum : %f, Effc, deltat, \n",);
+                SOC = Cb;
+            }
+            else {
+                SOC = SOC + E_t;
+                Var[i] = rd;
+            }
+        } else {
+            E_t = rd * discharge_rate * Cb / Effd * deltat;
+            if (SOC + E_t < 0.2*Cb) {
+                Var[i] = (0.2*Cb - SOC) / (discharge_rate / Effd * deltat * Cb);
+                SOC = 0.2*Cb;
+            }
+            else {
+                SOC = SOC + E_t;
+                Var[i] = rd;
+            }
+        }
+        // printf("SOC: %f, Var[%d] : %f, Cb : %f\n", SOC, i, Var[i], Cb);
+    }
+    // Init the Pprev variables
+    double last_val = bounds[indPprev[0]][0] ;
+    for (int i = indPprev[0]; i < indPprev[1]; i++) {
+        Var[i] = last_val + ((double)rand() / RAND_MAX) * (bounds[i][1] - last_val) ;
+        last_val = Var[i] ;
+    }
+}
 
 // We have the equivalent of the Individual class
 

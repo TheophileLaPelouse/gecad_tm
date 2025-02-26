@@ -121,6 +121,10 @@ def series2lists(s, type_ = float, factor = 1) :
     return L
 
 Pprev = [120, 130, 130, 130, 130, 195]
+def gen_E(name) : 
+    Eautocons = series2lists(df['%s PV' % name])
+    Econs = series2lists(df['%s KWh' % name])
+    return Eautocons, Econs
 Econs = series2lists(df['TUBACER KWh'])
 Eautocons = series2lists(df['TUBACER PV'])
 step = 0.25 # 15 minutes

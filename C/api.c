@@ -22,9 +22,9 @@ void* run_comp(
     
     Model *model = init_model(Var_size, Econs, Eprod, indexPb, deltat, charge_rate, discharge_rate, Effc, Effd, TE, TP, indexPprev, Nbdays, Kp, tep, indexCb, TB, batterie_life, TBm, SOC, tot_time, n_tot_time, time_month, n_time_month, months, n_m, periods, n_p);
     printf("Model Econs avant : %f\n", model->Econs[0]);
-    for (int i = 0; i < Var_size; i++) {
-        printf("opti_bounds[%d][0]: %f, opti_bounds[%d][1]: %f\n", i, opti_bounds[i][0], i, opti_bounds[i][1]);
-    }
+    // for (int i = 0; i < Var_size; i++) {
+    //     printf("opti_bounds[%d][0]: %f, opti_bounds[%d][1]: %f\n", i, opti_bounds[i][0], i, opti_bounds[i][1]);
+    // }
     if (code == 1) {
     Individual best_indiv = GA(model, opti_bounds, nb_pop, nb_gen, pl, pq, mutation_rate, last_element, threshold, fac, min_mut, max_mut);
     printf("Model Econs après : %f\n", model->Econs[0]);
