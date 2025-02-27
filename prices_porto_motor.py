@@ -8,8 +8,19 @@ Created on Wed Feb 26 15:17:13 2025
 
 # Prices for Portomotor
 
-TP_pm_2024 = []
+TP_pm_2024 = [0.047627, 0.028865, 0.020752, 0.016453, 0.008116, 0.004946]
 
 TE_pm_2024 = [
-      []
+      [0.241867 for k in range(6)], 
+      [0.241867 for k in range(6)], 
+      [0.241867 for k in range(6)], 
+      [0.241867 for k in range(6)],
+      [0.242289 for k in range(6)], 
+      [0.241867 for k in range(6)], 
+      [0.241867 for k in range(6)], 
+      [0.172 for k in range(6)], 
+      [0.172 for k in range(6)], 
+      [0.172 for k in range(6)],
+      [0.172 for k in range(6)],
+      [0.172 for k in range(6)]
       ]

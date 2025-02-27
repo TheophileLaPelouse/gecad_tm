@@ -22,6 +22,7 @@ In case you don't know, "#%%" is used to define cells like in a notebook that ca
 
 import pandas as pd 
 import matplotlib.pyplot as plt
+import os 
 
 #%% Defining DF a dictionnary of dataframes with values from prix2024.csv
 year = '2024'
@@ -56,7 +57,7 @@ for key in d_lines :
 
 #%%read excel
 
-df = pd.read_excel('dados_espanha_xlsx.xlsx', sheet_name='All')
+# df = pd.read_excel('dados_espanha_xlsx.xlsx', sheet_name='All')
 
 #%% Function to calculate the price
     
@@ -121,25 +122,64 @@ def series2lists(s, type_ = float, factor = 1) :
     return L
 
 Pprev = [120, 130, 130, 130, 130, 195]
-def gen_E(name) : 
-    Eautocons = series2lists(df['%s PV' % name])
-    Econs = series2lists(df['%s KWh' % name])
-    return Eautocons, Econs
-Econs = series2lists(df['TUBACER KWh'])
-Eautocons = series2lists(df['TUBACER PV'])
-step = 0.25 # 15 minutes
-Pcons = series2lists(df['TUBACER KWh']-df['TUBACER PV'], factor = 1/step)
+#%%
+def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dados_espanha_xlsx.xlsx'), sheet_name='All', prod_col=None, cons_col=None, date_col='DATE', time_col='TIME', one_time_col=False, format=None, first_index=0, fac = 1): 
+    
+    df = pd.read_excel(path, sheet_name=sheet_name)
+    print(df.columns)
+    first_valid_index = df[date_col].first_valid_index()
+    df = df.loc[max(first_valid_index, first_index):]
+    prod_col = prod_col if prod_col else '%s PV' % name
+    cons_col = cons_col if cons_col else '%s KWh' % name
+    if not prod_col == -1 :
+        Eautocons = series2lists(df[prod_col], factor=fac)
+    Econs = series2lists(df[cons_col], factor=fac)
+    print('OK1')
+    if prod_col == -1 :
+        Eautocons = [0 for _ in range(len(Econs))]
+    
+    if one_time_col :
+        full_date=list(pd.to_datetime(df[date_col], format=format))
+        print("OK2")
+    else : 
+        Date = df[date_col].dropna()
+        index = Date.index
+        full_date = []
+        
+        for k in index :
+            if format is None : 
+                full_date.append(pd.Timestamp.combine(df[date_col][k].date(), df[time_col][k]))
+            else : 
+                print(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format)
+                full_date.append(dt.datetime.strptime(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format))
+        print("OK3")
+    deltat = (full_date[1] - full_date[0]).total_seconds()/3600
+    for k in range(len(full_date)-1) : 
+        deltak = (full_date[k+1] - full_date[k]).total_seconds()/3600
+        if isinstance(deltat, list) :
+            deltat.append(deltak)
+        elif deltak != deltat : 
+            deltat = [deltat for _ in range(k)]
+        
+    print("OK5")
+    return Eautocons, Econs, full_date, deltat
+#%%
+Eautocons, Econs, full_date, deltat = treat_data()
+# Econs = series2lists(df['TUBACER KWh'])
+# Eautocons = series2lists(df['TUBACER PV'])
+# step = 0.25 # 15 minutes
+# Pcons = series2lists(df['TUBACER KWh']-df['TUBACER PV'], factor = 1/step)
 TP = series2lists(DF['P'].loc[6.1], factor = 1/365) # For TE and TP we also will calculate using the prices from the invoice 
 TE = series2lists(DF['E'].loc[6.1])
 TEauto = series2lists(DF['Eauto'].loc['NT2']) # Maybe this should not be taken into account (it represents in total only 6€)
 tep = series2lists(DF['penaltie'].loc[6.1])[0]
 Kp = series2lists(DF['Kp'].loc[6.1])
 
-Date = df['DATE'].dropna()
-index = Date.index
-full_date = []
-for k in index : 
-    full_date.append(pd.Timestamp.combine(df['DATE'][k].date(), df['TIME'][k]))
+# Date = df['DATE'].dropna()
+# index = Date.index
+# full_date = []
+# for k in index : 
+#     full_date.append(pd.Timestamp.combine(df['DATE'][k].date(), df['TIME'][k]))
 
 #%% Agenda 
 import datetime as dt
