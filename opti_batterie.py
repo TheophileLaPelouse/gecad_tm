@@ -62,7 +62,7 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
     Seauto = 0
     Spena = 0
     Sp = 0
-    Spena_P = [0.000000000001 for k in range(6)] # Should be different than 0 because of differentiation of the square root 
+    Spena_P = [[0.000000000001 for k in range(6)] for m in range(12)] # Should be different than 0 because of differentiation of the square root 
     for p in range(len(TP)) :
         Sp += TP[p]*model.Pprev[p]*Nbdays
         if opti :  
@@ -83,10 +83,11 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
             # Pgrid = (Egrid_plus[t]+Egrid_minus[t])/deltat
             # Pgrid = Pcons[t] - Pd[t] - Eautocons[t]/deltat + Pc[t]
             # Spena_P[p] += ((Pgrid - Pprev[p] + abs(Pgrid - Pprev[p]))/2)**2 
-            Spena_P[p] += (model.Pplus[t, p])**2
-            
-        Spena_P[p] = Spena_P[p]**(1/2)
-        Spena += Kp[p]*tep*Spena_P[p]
+            Spena_P[m][p] += (model.Pplus[t, p])**2
+        
+        for m in range(12) : 
+            Spena_P[m][p] = Spena_P[m][p]**(1/2)
+        Spena += Kp[p]*tep*sum(Spena_P[m][p] for m in range(12))
         if printation :
             if isinstance(Spena_P[p], float) : 
                 print("Spena_P", Spena_P[p])
@@ -287,7 +288,7 @@ Pprev = [model.Pprev[k].value for k in range(6)]
 Pc = [model.Pc[k].value for k in model.time]
 Pd = [model.Pd[k].value for k in model.time]
 Cb = model.Cb.value
-res = calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month, False, printation=True)
+res = calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month, False, printation=False)
 
 #%% Using repr days part 1
 
@@ -332,6 +333,8 @@ for t in big.time :
         big.Pplus[t, p].value = Pplus*(Pplus>0)
         big.Pminus[t, p].value = -Pplus*(Pplus<0)
 
+Time, Nbdays, Time_in_month = define_time2(full_date, period_hours)
+res = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=True)
 
 #%% Bat_price influence 
 obj = []

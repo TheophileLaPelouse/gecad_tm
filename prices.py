@@ -150,8 +150,11 @@ def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dad
             if format is None : 
                 full_date.append(pd.Timestamp.combine(df[date_col][k].date(), df[time_col][k]))
             else : 
-                print(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format)
-                full_date.append(dt.datetime.strptime(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format))
+                # print(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format)
+                t = str(df[time_col][k])
+                if t == '24' : 
+                    t = '0'
+                full_date.append(dt.datetime.strptime(str(df[date_col][k]) + ' ' + t, format))
         print("OK3")
     deltat = (full_date[1] - full_date[0]).total_seconds()/3600
     for k in range(len(full_date)-1) : 
@@ -190,6 +193,7 @@ texto_elements = root.findall('.//texto')
 month_list = {'Enero' : 1, 'Febrero' : 2, 'Marzo' : 3, 'Abril' : 4, 'Mayo' : 5, 'Junio' : 6, 'Julio' : 7, 'Agosto' : 8, 'Septiembre' : 9, 'Octubre' : 10, 'Noviembre' : 11, 'Diciembre' : 12}
 current_month = 0
 None_working_days = []
+None_working_days_2023 = []
 if texto_elements : 
     cal_text = texto_elements[-1]
     p_elements = cal_text.findall('.//p')
@@ -208,6 +212,7 @@ if texto_elements :
             elif date.startswith('Día') : 
                 date = int(date.split()[1])
                 None_working_days.append(dt.datetime(int(year), current_month, date))
+                None_working_days_2023.append(dt.datetime(int(year)-1, current_month, date))
         k += 1
     
 period_hours = [[[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], [(0, 8)]], 
@@ -223,6 +228,8 @@ period_hours = [[[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], 
               [[], [(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [(0, 8)]],
               [[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], [(0, 8)]]
               ]
+
+period_hours_20 = [[[(10, 14), (18, 22)], [(8, 10), (14, 18), (22, 24)], [0, 8]] for k in range(12)]
 """
 period_hours is built as such :
 period_hours[number of the month (1 to 12) - 1][number of the period (0 to 5)] is a list of the time interval for the corresponding period.
@@ -242,7 +249,7 @@ def in_period(l, val) :
 # such as the table for the energy and for the power.
 timeframe = (dt.datetime(2024, 8, 31, 23, 59), dt.datetime(2024, 9, 30, 23, 59))
 
-def define_time(timeframe, period_hours, full_date = full_date) : 
+def define_time(timeframe, period_hours, full_date = full_date, tarif20=False) : 
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
@@ -250,7 +257,8 @@ def define_time(timeframe, period_hours, full_date = full_date) :
         date = full_date[k]    
         if date >= timeframe[0] and date <= timeframe[1] : 
             if date.weekday() >= 5 or date in None_working_days : 
-                P = 5
+                if tarif20 : P = 2
+                else : P = 5
             else : 
                 month = date.month
                 time = date.hour + date.minute/60
@@ -312,7 +320,7 @@ def search_dico(l, val, deb_or_fin = 'deb') :
         return fin
     
     
-def define_time2(days, period_hours) : 
+def define_time2(days, period_hours, tarif20=False) : 
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
@@ -326,7 +334,8 @@ def define_time2(days, period_hours) :
             c += 1
             previous_date = date.date()
         if date.weekday() >= 5 or date in None_working_days : 
-            P = 5
+            if tarif20 : P = 2
+            else : P = 5
         else :
             month = date.month
             time = date.hour + date.minute/60

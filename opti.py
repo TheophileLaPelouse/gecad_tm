@@ -125,10 +125,10 @@ def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp,
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe =(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 1, 30, 23, 59))
-def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
+def build_model(timeframe, full_date=full_time, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
     Pcons = [val/deltat for val in Econs]
     if definer == 1 :
-        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours, full_date=full_date)
         Nbdays += 1
         timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
     elif definer == 2 :
@@ -142,7 +142,9 @@ def build_model(timeframe, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0
     model = pyo.ConcreteModel()
     
     model.period = pyo.RangeSet(0, len(TP)-1)
-    model.month = pyo.RangeSet(0, 10)
+    month0 = timeframe[0].month -1
+    month1 = timeframe[-1].month - 1
+    model.month = pyo.RangeSet(month0, month1)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
     model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 130, 130, 130, 130, 195])
@@ -514,13 +516,13 @@ if __name__ == '__main__' :
         for p in range(6) : 
             small.Pprev[p].value = original[p]
         print("\nMonth %d original" % month)
-        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
+        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
         Origin.append(small.obj())
         Pena_original.append(pena())
         for p in range(6) : 
             small.Pprev[p].value = opti[p]
         print("\nMonth %d opti" % month)
-        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
+        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
         Opti.append(small.obj())
         Pena_opti.append(pena())
         Conso.append(sum([Econs[t] for t in Time_in_month[month]]))
