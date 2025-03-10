@@ -37,6 +37,14 @@ Values['Narontec']['2024'] = {}
 Values['Narontec']['2023'] = {}
 Values['TMG']['2024'] = {}
 
+""" 
+Eautocons or Eprod is the produced energy 
+Econs is the consumed energy
+full_time is a list of datetime objects 
+-> All should be indexed over a same index, so Eprod[0] = produced energy at full_time[0] (and same with Econs)
+See the docstring of the function treat_data for more information
+"""
+
 #Tubacer
 Eautocons, Econs, full_time, deltat = treat_data(name="TUBACER")
 dico = Values['Tubacer']['2024']
@@ -61,6 +69,7 @@ na2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '3_NARONTEC', 
 na2023_path = os.path.join(os.path.dirname(__file__), 'Datasets', '3_NARONTEC', 'Narontec_2023_hourly.xlsx')
 
 dico = Values['Narontec']['2024']
+
 Eautocons, Econs, full_time, deltat = treat_data(path=na2024_path, prod_col=-1, cons_col='Consumo kWh', 
                                                  date_col='Fecha', time_col='Hora', format="%d/%m/%Y %H", 
                                                  one_time_col=False, sheet_name=0)
@@ -95,12 +104,12 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
         model.Pprev[p].value = original[p]
     original_price = model.obj()
 
-    res, pena = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
+    res, pena, _, _ = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
 
     pena_ori = pena()
     results = solver.solve(model, tee=False)
 
-    res, pena = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
+    res, pena, _, _ = calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays_year, Time_in_month, deltat, printation=True, sep_pena=True)
     pena_opti=pena()
 
     opti = [model.Pprev[p].value for p in model.period]
@@ -129,6 +138,8 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
     Compare = []
     Pena_original =[]
     Pena_opti = []
+    Power_original = []
+    Power_opti = []
     results = pd.DataFrame(columns=['Month', 'Original', 'Optimized', 'Oldptimized', 'Pena_origin', 'Pena_opti', 'Consumption', 'Production', 'Compare', 'Compare old'])
 
     for month in months :
@@ -139,15 +150,17 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
         for p in range(6) : 
             small.Pprev[p].value = original[p]
         print("\nMonth %d original" % month)
-        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
+        res, pena, _, sp = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
         Origin.append(small.obj())
         Pena_original.append(pena())
+        Power_original.append(sp() if sp is not isinstance(sp, float) else sp)
         for p in range(6) : 
             small.Pprev[p].value = opti[p]
         print("\nMonth %d opti" % month)
-        res, pena = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
+        res, pena, _, sp = calculate_price(small.Pprev, small.Pcons, small.Econs, small.Eautocons, small.TP, small.TE, small.TEauto, small.Time, small.tep, small.Kp, Nbdays, Time_in_month, deltat, printation=True, sep_pena=True)
         Opti.append(small.obj())
         Pena_opti.append(pena())
+        Power_opti.append(sp() if sp is not isinstance(sp, float) else sp)
         for p in range(6) : 
             small.Pprev[p].value = opti_prev[p]
         Opti_prev.append(small.obj())
@@ -164,6 +177,8 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
     results['Compare'] = Compare
     results['Pena_origin'] = Pena_original
     results['Pena_opti'] = Pena_opti
+    results['Power_origin'] = Power_original
+    results['Power_opti'] = Power_opti
     results.loc['Total'] = results.sum(numeric_only=True)
     results.loc['Total', 'Month'] = 'Total'
     results.loc['Total', 'Compare'] = (results.loc['Total', 'Original'] - results.loc['Total', 'Optimized'])/results.loc['Total', 'Original']
@@ -183,21 +198,21 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
 
 
 def compute(comp, year, opti_prev=[]) : 
-    try : 
-        Eautocons = Values[comp][year]['Eautocons']
-        Econs = Values[comp][year]['Econs']
-        full_time = Values[comp][year]['full_time']
-        deltat = Values[comp][year]['deltat']
-        results, decrease, model = produce_results(full_time, TE_comp, TP_comp, Econs, Eautocons, deltat, original, opti_prev)
-        print(results)
-        print()
-        print(comp, year, decrease)
-        Values[comp][year]['result'] = results
-    except Exception as e :
-        print()
-        print(e)
-        print()
-        print("On a bugué sur %s %s" % (comp, year))
+    # try : 
+    Eautocons = Values[comp][year]['Eautocons']
+    Econs = Values[comp][year]['Econs']
+    full_time = Values[comp][year]['full_time']
+    deltat = Values[comp][year]['deltat']
+    results, decrease, model = produce_results(full_time, TE_comp, TP_comp, Econs, Eautocons, deltat, original, opti_prev)
+    print(results)
+    print()
+    print(comp, year, decrease)
+    Values[comp][year]['result'] = results
+    # except Exception as e :
+    #     print()
+    #     print(e)
+    #     print()
+    #     print("On a bugué sur %s %s" % (comp, year))
     return model
 
 for comp in Values : 
@@ -224,7 +239,7 @@ for comp in Values :
 path = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'Pcontracted_opti.csv')
 
 with open(path, 'w') :
-    print("clean up file")
+    print("clean up file %s" % path)
     
 for comp in Values :
     for year in Values[comp] :
@@ -240,6 +255,146 @@ for comp in Values :
                 with open(path, 'a') as f : 
                     f.write('\n\n')
             
+#%%
+path = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'Pcontracted_values.csv')
+with open(path, 'w') :
+    print("clean up file %s" % path)
+for comp in Values : 
+    for year in Values[comp] : 
+        if year.isnumeric() : 
+            with open(path, 'a') as f :
+                f.write(comp + ' ' + year + '\n')
+                for p in range(6) : 
+                    f.write(f'P{p+1} {Values[comp][year]["Pprev"][p]:.1f}\n')
+                f.write('\n\n')
             
+#%%
+
+data = {}
+for comp in Values : 
+    if Values[comp] : 
+        data[comp] = {}
+        data[comp]['Optimal (kW)'] = Values[comp]['2024']['Pprev'][:]
+        data[comp]['Original (kW)'] = Values[comp]['original'][:]
+        diffs = []
+        for k in range(6) :
+            diff = -Values[comp]['original'][k] +Values[comp]['2024']['Pprev'][k]
+            if diff > 0 : 
+                diffs.append(f'+{diff:.1f}')
+            else :
+                diffs.append(f'{diff:.1f}')
+        data[comp]['Difference (kW)'] = diffs
+    
+columns_sup = [comp for comp in Values]
+columns_inf = ['Optimal (kW)', 'Original (kW)', 'Difference (kW)']
+dfs = []
+for comp in data : 
+    columns = pd.MultiIndex.from_product([[comp], columns_inf])
+    df = pd.DataFrame(columns=columns)
+    for col in columns : 
+        if data.get(col[0]) :
+            df[col] = data[comp][col[1]]
+    df.index = [f'P{k+1}' for k in range(6)]
+    dfs.append(df)
+# columns = pd.MultiIndex.from_product([columns_sup, columns_inf])
+# index = [f'P{k+1}' for k in range(6)]
+# df = pd.DataFrame(columns=columns)
+
+# for col in columns : 
+#     if data.get(col[0]) : 
+#         df[col] = data[col[0]][col[1]]
+    
+# df.index = index
+
+# styled_df = df.style.format(precision=1).set_caption("Contracted Power Comparison").set_table_styles(overwrite=False)
+
+# Convert the styled DataFrame to LaTeX
+# latex_table = styled_df.to_latex(hrules=True)
+
+# Write the LaTeX table to a file
+Styler = {
+    }
+with open('output_table.tex', 'w') as f:
+    c = 0
+    for df in dfs : 
+        if not c :
+            styled_df = df.style.format(precision=1).set_caption("Contracted Power Comparison").set_table_styles(Styler, overwrite=False)
+            c += 1
+        else :
+            styled_df = df.style.format(precision=1).set_table_styles(Styler, overwrite=False)
+        latex_table = styled_df.to_latex(column_format="|c|c|c|c|", position='center')
+        f.write(latex_table+"\n")
+
+#%% Latex table for costs
+
+columns = ['Company', 'Original cost (€)', 'Optimized cost (€)', 'Decrease (%)']
+data = {}
+data['Company'] = ['Tubacer 2024', 'Porto Motor 2024', 'Porto Motor 2023', 'Narontec 2024', 'Narontec 2023', 'TMG 2024']
+data['Original cost (€)'] = [Values['Tubacer']['2024']['result'].loc['Total', 'Original'], 
+                             Values['Porto Motor']['2024']['result'].loc['Total', 'Original'], 
+                             Values['Porto Motor']['2023']['result'].loc['Total', 'Original'],
+                             Values['Narontec']['2024']['result'].loc['Total', 'Original'], 
+                             Values['Narontec']['2023']['result'].loc['Total', 'Original'], 
+                             Values['TMG']['2024']['result'].loc['Total', 'Original'], 
+                             ]
+data['Optimized cost (€)'] = [Values['Tubacer']['2024']['result'].loc['Total', 'Optimized'],
+                              Values['Porto Motor']['2024']['result'].loc['Total', 'Optimized'],
+                              Values['Porto Motor']['2023']['result'].loc['Total', 'Optimized'],
+                              Values['Narontec']['2024']['result'].loc['Total', 'Optimized'],
+                              Values['Narontec']['2023']['result'].loc['Total', 'Optimized'],
+                              Values['TMG']['2024']['result'].loc['Total', 'Optimized']
+                              ]
+data['Decrease (%)'] = [Values['Tubacer']['2024']['result'].loc['Total', 'Compare'],
+                        Values['Porto Motor']['2024']['result'].loc['Total', 'Compare'],
+                        Values['Porto Motor']['2023']['result'].loc['Total', 'Compare'],
+                        Values['Narontec']['2024']['result'].loc['Total', 'Compare'],
+                        Values['Narontec']['2023']['result'].loc['Total', 'Compare'],
+                        Values['TMG']['2024']['result'].loc['Total', 'Compare']
+                        ]
+
+df = pd.DataFrame(data=data, columns=columns)
+df['Decrease (%)'] = df['Decrease (%)']*100
+df['Decrease (%)'] = df['Decrease (%)'].round(2).map('{:,.2f}'.format)
+df['Original cost (€)'] = df['Original cost (€)'].round(-1).map('{:,.0f}'.format)
+df['Optimized cost (€)'] = df['Optimized cost (€)'].round(-1).map('{:,.0f}'.format)
+styled_df = df.style.set_caption("Total cost comparison").set_table_styles(Styler, overwrite=False)
+latex_table = styled_df.to_latex(column_format="|c|c|c|c|", position='center')
+with open('output_table_costs.tex', 'w') as f:
+    f.write(latex_table)
+
+#%% Plot mean load and PV 
+
+from representative_days import separate_days
+
+for comp in Values : 
+    if Values[comp] :  
+        for year in Values[comp] : 
+            if year.isnumeric() : 
+                Eautocons = Values[comp][year]['Eautocons']
+                Econs = Values[comp][year]['Econs']
+                full_time = Values[comp][year]['full_time']
+                TE_comp = Values[comp]['TE']    
+                # TP_comp = Values[comp]['TP']
+                Days = separate_days(Econs, Eautocons, full_time, TE=TE_comp)
+                mean_Econs = [0 for k in range(len(Days[0]['Econs']))]
+                mean_Eprod = [0 for k in range(len(Days[0]['Eprod']))]
+                nb_val = [0 for k in range(len(Days[0]['Econs']))]
+                print(comp, year)
+                for i in range(len(Days)) : 
+                    for t in range(len(Days[i]['Econs'])) : 
+                        print(i, len(Days[i]['Econs']))
+                        print(t, len(mean_Econs))
+                        mean_Econs[t] += Days[i]['Econs'][t]
+                        mean_Eprod[t] += Days[i]['Eprod'][t]
+                        nb_val[t] += 1
+                for t in range(len(Days[0]['Econs'])) :
+                    mean_Econs[t] /= nb_val[t]
+                    mean_Eprod[t] /= nb_val[t]
+                Values[comp][year]['mean_Econs'] = mean_Econs
+                Values[comp][year]['mean_Eprod'] = mean_Eprod
+                                    
+        
+
+
             
         

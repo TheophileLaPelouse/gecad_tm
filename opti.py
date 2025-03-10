@@ -14,7 +14,7 @@ from prices import define_time, treat_data, TEauto, tep, Kp, period_hours, Eauto
 from representative_days import create_data, gen_new_data
 from prices_tubacer import TE, TE_new, TP, TP_new
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
-
+#%%
 pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
 Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
@@ -83,7 +83,7 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
         print("Spena", Spena())
         print("Sp",Sp, Sp())
     if sep_pena :
-        return (Se + Seauto + Spena + Sp), Spena
+        return (Se + Seauto + Spena + Sp), Spena, Se, Sp
     return Se + Seauto + Spena + Sp
 
 def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, nb_repr, Time_in_month, deltat, opti = True, printation=False) :
@@ -125,7 +125,7 @@ def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp,
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe =(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 1, 30, 23, 59))
-def build_model(timeframe, full_date=full_time, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
+def build_model(timeframe, full_date=full_date, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
     Pcons = [val/deltat for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours, full_date=full_date)
@@ -629,3 +629,94 @@ if __name__ == '__main__' :
     solver = SolverFactory('ipopt')
     solver.options['print_level'] = 7
     results = solver.solve(model, tee=True)
+    
+#%% Plot opti interest Tubacer
+if __name__ == '__main__' : 
+    
+    Eautocons, Econs, full_time, deltat = treat_data(name="TUBACER")
+
+    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE, TP=TP, Econs=Econs, Eautocons=Eautocons)
+    res0 = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)()
+    solver = SolverFactory('ipopt')
+    solver.options['print_timing_statistics'] = 'yes'
+    results = solver.solve(model_year, tee=True)
+    Pprev = [model_year.Pprev[k].value for k in range(6)]
+    res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)
+
+    # from multidim_poly_fit import *
+    import numpy as np
+    opti = Pprev
+    original = [120, 130, 130, 130, 130, 195]
+    too_much = [200, 200, 200, 200, 200, 200]
+    n = 15
+    values = [list(np.linspace(original[p], opti[p], n//2)) for p in range(6)]
+    values = [values[p] + list(np.linspace(opti[p], too_much[p], n//2)) for p in range(6)]
+    n = (n//2)*2
+    Pena_prices = []
+    Power_prices = []
+    for k in range(n) : 
+        for p in range(6) : 
+            model_year.Pprev[p].value = values[p][k]
+        res, pena, se, sp = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, sep_pena=True)
+        Pena_prices.append(pena() if not isinstance(pena, float) else pena)
+        Power_prices.append(sp() if not isinstance(sp, float) else sp)
+    
+    fig, ax = plt.subplots()
+    ax.plot(Pena_prices, Power_prices, '+', markersize=10)
+    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=10)
+    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=10)
+    ax.plot(Pena_prices[n//2], Power_prices[n//2], '+', color='orange', markersize=10)
+    ax.annotate(f'Optimal contracted power : {tuple(round(val) for val in opti)}\nConstracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+150, Power_prices[n//2]+100))
+    ax.annotate(f'Orignal contracted power : {tuple(round(val) for val in original)}\nConstracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+150, Power_prices[0]+100))
+    ax.annotate(f'Oversized contracted power : {tuple(round(val) for val in too_much)}\nConstracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]+150, Power_prices[-1] - 50))
+    ax.set_xlabel('Yearly penalization cost (€)')
+    ax.set_ylabel('Yearly contracted power cost (€)')
+    ax.set_xlim(-100, 10000)
+    plt.show()
+        
+#%% Same for Porto motor
+
+if __name__ == '__main__' : 
+    pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
+    Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+                                                 format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+    
+    deltat = deltat[0]
+    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons)
+    res0 = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)()
+    solver = SolverFactory('ipopt')
+    solver.options['print_timing_statistics'] = 'yes'
+    results = solver.solve(model_year, tee=True)
+    Pprev = [model_year.Pprev[k].value for k in range(6)]
+    res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)
+
+    import numpy as np
+    opti = Pprev
+    original = [35, 35, 35, 35, 35, 35]
+    not_so_much = [15, 15, 15, 15, 15, 15]
+    n = 15
+    values = [list(np.linspace(original[p], opti[p], n//2)) for p in range(6)]
+    values = [values[p] + list(np.linspace(opti[p], not_so_much[p], n//2)) for p in range(6)]
+    n = (n//2)*2
+    Pena_prices = []
+    Power_prices = []
+    for k in range(n) : 
+        for p in range(6) : 
+            model_year.Pprev[p].value = values[p][k]
+        res, pena, se, sp = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, sep_pena=True)
+        Pena_prices.append(pena() if not isinstance(pena, float) else pena)
+        Power_prices.append(sp() if not isinstance(sp, float) else sp)
+    
+    fig, ax = plt.subplots()
+    ax.plot(Pena_prices, Power_prices, '+', markersize=10)
+    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=10)
+    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=10)
+    ax.plot(Pena_prices[n//2], Power_prices[n//2], '+', color='orange', markersize=10)
+    ax.annotate(f'Optimal contracted power : {tuple(round(val) for val in opti)}\nConstracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+50, Power_prices[n//2]+1))
+    ax.annotate(f'Orignal contracted power : {tuple(round(val) for val in original)}\nConstracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+50, Power_prices[0]+1))
+    ax.annotate(f'Undersized contracted power : {tuple(round(val) for val in not_so_much)}\nConstracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]+50, Power_prices[-1]+1))
+    ax.set_xlabel('Yearly penalization cost (€)')
+    ax.set_ylabel('Yearly contracted power cost (€)')
+    ax.set_xlim(-100, 2000)
+    ax.set_ylim(550, 1500)
+    plt.show()

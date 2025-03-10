@@ -124,7 +124,29 @@ def series2lists(s, type_ = float, factor = 1) :
 Pprev = [120, 130, 130, 130, 130, 195]
 #%%
 def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dados_espanha_xlsx.xlsx'), sheet_name='All', prod_col=None, cons_col=None, date_col='DATE', time_col='TIME', one_time_col=False, format=None, first_index=0, fac = 1): 
-    
+    """Treat the data from the excel file using different option depending on the data format
+    Econs, Eprod, full_time have the same index, such that Econs[k] is the energy consumption at the time full_time[k]
+    deltat can be a list but for all our file we can take the first value as the deltat will be constant, if it is not it is only because of change of hour.
+
+    Args:
+        name (str, optional): name of the company (as written in the columns) if using dados_espnha_xlsx file. Defaults to "TUBACER".
+        path (str, optional): file path of the excel. Defaults to os.path.join(os.path.dirname(__file__), 'dados_espanha_xlsx.xlsx').
+        sheet_name (str, optional): Sheet name of the excel (0 if first page). Defaults to 'All'.
+        prod_col (str, optional): Name of the production column. Defaults to None.
+        cons_col (str, optional): Name of the consumption column. Defaults to None.
+        date_col (str, optional): Name of the date column. Defaults to 'DATE'.
+        time_col (str, optional): Name of the time column. Defaults to 'TIME'.
+        one_time_col (bool, optional): True if date and time in the same column (assumed as date_col). Defaults to False.
+        format (str, optional): date format. Defaults to None.
+        first_index (int, optional): Index of the first row to be read. Defaults to 0.
+        fac (int, optional): multiplication factor to pass from W to kW for example. Defaults to 1.
+
+    Returns:
+        Econs (list): List of the energy consumption
+        Eprod (list): List of the energy production
+        full_time (list): List of datetime
+        deltat (list or float): list of the deltat between each t and t+1 but can be a float if all the deltat are the same
+    """
     df = pd.read_excel(path, sheet_name=sheet_name)
     print(df.columns)
     first_valid_index = df[date_col].first_valid_index()

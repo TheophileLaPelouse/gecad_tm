@@ -241,6 +241,8 @@ def separate_days(Econs, Eprod, full_date, TE = TE, period_hours=period_hours, d
             if flag : 
                 break
             p += 1
+        # print(date)
+        # print(month, p, len(TE), len(TE[0]))
         Days[-1]['price'].append(TE[month-1][p])
         Days[-1]['payed'].append((Econs[k] - Eprod[k])*TE[month-1][p])
         Days[-1]['Etot'].append(Econs[k] - Eprod[k])
