@@ -365,9 +365,10 @@ with open('output_table_costs.tex', 'w') as f:
 #%% Plot mean load and PV 
 
 from representative_days import separate_days
+import matplotlib.pyplot as plt
 
 for comp in Values : 
-    if Values[comp] :  
+    if Values[comp] and comp != 'Narontec':  
         for year in Values[comp] : 
             if year.isnumeric() : 
                 Eautocons = Values[comp][year]['Eautocons']
@@ -382,16 +383,60 @@ for comp in Values :
                 print(comp, year)
                 for i in range(len(Days)) : 
                     for t in range(len(Days[i]['Econs'])) : 
-                        print(i, len(Days[i]['Econs']))
-                        print(t, len(mean_Econs))
+                        # print(i, len(Days[i]['Econs']))
+                        # print(t, len(mean_Econs))
                         mean_Econs[t] += Days[i]['Econs'][t]
                         mean_Eprod[t] += Days[i]['Eprod'][t]
                         nb_val[t] += 1
                 for t in range(len(Days[0]['Econs'])) :
+                    print(t)
                     mean_Econs[t] /= nb_val[t]
                     mean_Eprod[t] /= nb_val[t]
                 Values[comp][year]['mean_Econs'] = mean_Econs
                 Values[comp][year]['mean_Eprod'] = mean_Eprod
+                
+
+plt.rcParams['font.size'] = 12
+
+fig, axs = plt.subplots(2, 2)
+
+companies = []
+for key in Values : 
+    if Values[key] and key != 'Narontec': 
+        if '2023' in Values[key] : 
+            companies.append(key + ' 2023')
+        companies.append(key + ' 2024')
+        
+pos = {'Tubacer 2024' : (0, 0), 'TMG 2024' : (0, 1), 'Porto Motor 2023' : (1, 0), 'Porto Motor 2024' : (1, 1)}
+        
+for i in range(len(companies)):
+    comp = companies[i]
+    print(i, i//2, i%2)
+    x, y = pos[comp]
+    ax = axs[x, y]
+    words = comp.split()
+    comp = ' '.join(words[:-1])
+    year = words[-1]
+    print(comp, year)
+    # if comp == 'Porto Motor' : 
+    #     ax.set_ylim(0, 1.3)
+    mean_Econs = Values[comp][year]['mean_Econs']
+    mean_Eprod = Values[comp][year]['mean_Eprod']
+    t = list(range(len(mean_Econs)))
+    t = [val*24/len(mean_Econs) for val in t]
+    mean_Econs = [val/(24/len(mean_Econs)) for val in mean_Econs]
+    mean_Eprod = [val/(24/len(mean_Eprod)) for val in mean_Eprod]
+    ax.plot(t, mean_Econs, label='Mean Consumption')
+    if any(mean_Eprod) : 
+        ax.plot(t, mean_Eprod, label='Mean Production')
+    ax.set_title(comp + ' ' + year)
+    ax.set_xlabel('Hour of the day')
+    ax.set_ylabel('Power (kW)')
+    ax.legend()
+
+# Adjust layout
+plt.tight_layout()
+plt.show()
                                     
         
 

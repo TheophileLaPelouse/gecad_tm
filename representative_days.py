@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import silhouette_samples
 from random import random
-
-from prices import define_time, Econs, Eautocons as Eprod, TEauto, tep, Kp, period_hours, full_date, last_day, search_dico
+import os
+from prices import define_time, Econs, Eautocons as Eprod, TEauto, tep, Kp, period_hours, full_date, last_day, search_dico, treat_data, increase_deltat
 
 Pcons = [val/0.25 for val in Econs]
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
@@ -139,10 +139,11 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
     for frac in list_frac : 
         Days[str(frac)] = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'frac' : 1, 'sum_Econs_Eprod' : 0, 'day' : None}
         
-    if month != 11 : 
-        timeframe = (dt.datetime(2024, month, 1, 0, 0), last_day(dt.datetime(2024, month, 1, 0, 0)))
+    if month == full_date[-1].month :
+        timeframe = (dt.datetime(2024, month, 1, 0, 0), full_date[-1])
     else :
-        timeframe = (dt.datetime(2024, month, 1, 0, 0), dt.datetime(2024, month, 21, 23, 59))
+        timeframe = (dt.datetime(2024, month, 1, 0, 0), last_day(dt.datetime(2024, month, 1, 0, 0)))
+
     # Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
     d = timeframe[0]
         
@@ -224,6 +225,7 @@ def separate_days(Econs, Eprod, full_date, TE = TE, period_hours=period_hours, d
     Days = [{'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'day_number' : 0}]
     for k in range(n) : 
         date = full_date[k]
+        # print(date, previous_date)
         if date - previous_date > delta :
             Days.append({'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'day_number' : k})
             previous_date = date
@@ -321,15 +323,23 @@ def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n
 def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10, no_plot=False, norm=False) : 
     # For running test    
     ts = np.zeros((len(Days), len(Days[0]['date']), 2))
+    to_rm = []
     for k in range(len(Days)) : 
         for i in range(len(Days[0]['date'])) :
             if not norm :
-                ts[k, i, 0] = Days[k]['Econs'][i]
-                ts[k, i, 1] = Days[k]['Eprod'][i]
+                print(k, i)
+                try : 
+                    ts[k, i, 0] = Days[k]['Econs'][i]
+                    ts[k, i, 1] = Days[k]['Eprod'][i]
+                except IndexError : 
+                    to_rm.append(k)
             else : 
-                ts[k, i, 0] = Days[k]['Econs_norm'][i]
-                ts[k, i, 1] = Days[k]['Eprod_norm'][i]
-    
+                try : 
+                    ts[k, i, 0] = Days[k]['Econs_norm'][i]
+                    ts[k, i, 1] = Days[k]['Eprod_norm'][i]
+                except IndexError : 
+                    to_rm.append(k)
+    ts = np.delete(ts, to_rm, axis=0)
     formatted=to_time_series_dataset(ts)
     km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
     # km = KernelKMeans(n_clusters=nb_cluster, max_iter=max_iter, tol=tol, n_init=n_init)
@@ -555,6 +565,19 @@ def gen_new_data(Econs, Eprod, coef_rand=1, coef_Econs = 1, coef_Eprod = 1, offs
         Eprod_new.append(Eprod[k]*coef_Eprod + coef_rand*np.random.normal() + offset)
     return Econs_new, Eprod_new
     
+#%% define data
+if __name__ == '__main__' :
+    pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2023.xlsx')
+    Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+                                                        format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+    deltat = deltat[0]
+    Eprod, Econs, full_date, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat)
+    
+    from prices_porto_motor import TE_pm_2024, TP_pm_2024
+    TE = TE_pm_2024
+    TP = TP_pm_2024
+    
+
 #%% Create the days 
 
 # Econs_new = []
@@ -644,15 +667,16 @@ if __name__ == '__main__' :
 
 #%% Test cluster year        
 if __name__ == '__main__' : 
-    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 30, 23, 59))
+    # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 30, 23, 59))
+    timeframe=(full_date[0], full_date[-1])
     index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
     Econs_m = [Econs[k] for k in index]
     Eprod_m = [Eprod[k] for k in index]
     full_date_m = [full_date[k] for k in index]
-    cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m)
+    cluster_Days = separate_days(Econs_m, Eprod_m, full_date_m, TE=TE)
     S = []
     for k in range(1, 2) :
-        days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 5*k, tol=1e-08, n_init=1, metric="dtw", no_plot=True)
+        days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 5*k, tol=1e-08, n_init=1, metric="dtw", no_plot=False, norm=True)
         S.append(silhouette)
         
         
@@ -667,7 +691,7 @@ if __name__ == '__main__' :
 #%% Test cluster max days
 if __name__ == '__main__' :
     month= 8
-    timeframe = (dt.datetime(2024, month, 4, 0, 0), last_day(dt.datetime(2024, month, 4, 0, 0)))
+    timeframe = (dt.datetime(2023, month, 1, 0, 0), last_day(dt.datetime(2023, month, 4, 0, 0)))
     index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
     Econs_m = [Econs[k] for k in index]
     Eprod_m = [Eprod[k] for k in index]
@@ -687,7 +711,7 @@ if __name__ == '__main__' :
         plt.plot([Days[day]['Econs'][k] - Days[day]['Eprod'][k] for k in range(len(Days[day]['Eprod']))])
     plt.title("quantiles choice")
     
-    Econs_barys, Eprod_barys = generate_typical_kmean(cluster_Days, 5, method='barycenter', tol=1e-08, n_init=10, metric="dtw")
+    Econs_barys, Eprod_barys, nb_repr = generate_typical_kmean(cluster_Days, 5, method='barycenter', tol=1e-08, n_init=10, metric="dtw")
     plt.figure()
     for k in range(len(Econs_barys)) :
         plt.plot(Econs_barys[k]-Eprod_barys[k])

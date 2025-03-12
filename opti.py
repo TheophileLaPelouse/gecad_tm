@@ -8,41 +8,38 @@ import os
 from numpy.random import rand
 import matplotlib.pyplot as plt 
 import pandas as pd
+plt.rcParams['font.size'] = 20
 
 #%%
 from prices import define_time, treat_data, TEauto, tep, Kp, period_hours, Eautocons, Econs, full_date, deltat, define_time2, series2lists
 from representative_days import create_data, gen_new_data
 from prices_tubacer import TE, TE_new, TP, TP_new
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
-#%%
-pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
-Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
-                                                 format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
-deltat = deltat[0]
-Pcons = [val/deltat for val in Econs]
-Pprod = [val/deltat for val in Eautocons]
-
+# full_time = full_date
 
 #%% representative days 
 
-path_repr = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
-if not os.path.exists(path_repr) :
-    raise ValueError('You must run opti.search_best_repr first')
+if __name__ == '__main__' :
     
-df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
-
-Econs_repr = series2lists(df['Econs'])
-Eprod_repr = series2lists(df['Eprod'])
-full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
-
-path_repr_div = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
-if not os.path.exists(path_repr) :
-    raise ValueError('You must run opti.search_best_repr first')
+    path_repr = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+    if not os.path.exists(path_repr) :
+        raise ValueError('You must run opti.search_best_repr first')
+        
+    df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
     
-df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
-Econs_repr_div = series2lists(df['Econs'])
-Eprod_repr_div = series2lists(df['Eprod'])
-full_date_repr_div = [df['full_date'][k] for k in range(len(df['full_date']))]
+    Econs_repr = series2lists(df['Econs'])
+    Eprod_repr = series2lists(df['Eprod'])
+    full_date_repr = [df['full_date'][k] for k in range(len(df['full_date']))]
+    
+    path_repr_div = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr.csv')
+    if not os.path.exists(path_repr) :
+        raise ValueError('You must run opti.search_best_repr first')
+        
+    df = pd.read_csv(path_repr, sep=';', parse_dates=['full_date'])
+    Econs_repr_div = series2lists(df['Econs'])
+    Eprod_repr_div = series2lists(df['Eprod'])
+    full_date_repr_div = [df['full_date'][k] for k in range(len(df['full_date']))]
+
 #%% Model construction
 
 def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, deltat, opti = True, printation=False, sep_pena=False) :
@@ -382,7 +379,7 @@ def search_opti_wanted() :
         print(50-5*c)
     return Finals
 
-def new_test(wanted=50, path="Results/csv/best_repr_div.csv") :
+def new_test(wanted=50, path="Results/csv/best_repr_div.csv", Econs=Econs, Eprod=Eautocons) :
     timeframe=(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 11, 0, 1))
     def gen_random_cliped(before) : 
         r = 200*(rand()+0.2)
@@ -402,7 +399,7 @@ def new_test(wanted=50, path="Results/csv/best_repr_div.csv") :
     scores = []
     min_score = 1
     for k in range(1) : 
-        Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr = create_data(method="quantile", n_init=1, nb_days=35, forced_timeframe=timeframe, wanted=wanted)
+        Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr = create_data(method="quantile", n_init=1, nb_days=35, forced_timeframe=timeframe, wanted=wanted, Econs=Econs, Eprod=Eprod)
         model, _, Nbdays = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
         current = []
         
@@ -430,14 +427,22 @@ def new_test(wanted=50, path="Results/csv/best_repr_div.csv") :
 
 if __name__ == '__main__' :
     # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
-    # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
-    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024)
+    timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+    # model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024)
+    model_year, Time_in_month, Nbdays_year = build_model(timeframe, full_date=full_time)
     res0 = model_year.obj()
     solver = SolverFactory('ipopt')
     solver.options['print_timing_statistics'] = 'yes'
     results = solver.solve(model_year, tee=True)
     Pprev = [model_year.Pprev[k].value for k in range(6)]
     res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)
+
+#%%
+if __name__=='__main__' : 
+    pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
+    Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+                                                     format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+    deltat = deltat[0]
 
 #%% Solver 
 if __name__ == '__main__' :
@@ -662,16 +667,19 @@ if __name__ == '__main__' :
         Power_prices.append(sp() if not isinstance(sp, float) else sp)
     
     fig, ax = plt.subplots()
-    ax.plot(Pena_prices, Power_prices, '+', markersize=10)
-    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=10)
-    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=10)
-    ax.plot(Pena_prices[n//2], Power_prices[n//2], '+', color='orange', markersize=10)
-    ax.annotate(f'Optimal contracted power : {tuple(round(val) for val in opti)}\nConstracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+150, Power_prices[n//2]+100))
-    ax.annotate(f'Orignal contracted power : {tuple(round(val) for val in original)}\nConstracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+150, Power_prices[0]+100))
-    ax.annotate(f'Oversized contracted power : {tuple(round(val) for val in too_much)}\nConstracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]+150, Power_prices[-1] - 50))
+    ax.plot(Pena_prices, Power_prices, '+', markersize=20)
+    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=20)
+    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=20)
+    ax.plot(Pena_prices[n//2], Power_prices[n//2], 'o', color='orange', markersize=20)
+    tup = str(tuple(round(val) for val in opti)).replace(' ', '')
+    ax.annotate(f'Optimal contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+200, Power_prices[n//2]+200))
+    tup = str(tuple(round(val) for val in original)).replace(' ', '')
+    ax.annotate(f'Original contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0] - 1000, Power_prices[0]+200))
+    tup = str(tuple(round(val) for val in too_much)).replace(' ', '')
+    ax.annotate(f'Over-contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]+300, Power_prices[-1] - 200))
     ax.set_xlabel('Yearly penalization cost (€)')
     ax.set_ylabel('Yearly contracted power cost (€)')
-    ax.set_xlim(-100, 10000)
+    ax.set_xlim(-200, 15400)
     plt.show()
         
 #%% Same for Porto motor
@@ -680,9 +688,10 @@ if __name__ == '__main__' :
     pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
     Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
-    
+    full_date = full_time
     deltat = deltat[0]
-    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons)
+    
+    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons, deltat=deltat)
     res0 = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)()
     solver = SolverFactory('ipopt')
     solver.options['print_timing_statistics'] = 'yes'
@@ -707,16 +716,20 @@ if __name__ == '__main__' :
         Pena_prices.append(pena() if not isinstance(pena, float) else pena)
         Power_prices.append(sp() if not isinstance(sp, float) else sp)
     
+    
     fig, ax = plt.subplots()
-    ax.plot(Pena_prices, Power_prices, '+', markersize=10)
-    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=10)
-    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=10)
-    ax.plot(Pena_prices[n//2], Power_prices[n//2], '+', color='orange', markersize=10)
-    ax.annotate(f'Optimal contracted power : {tuple(round(val) for val in opti)}\nConstracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+50, Power_prices[n//2]+1))
-    ax.annotate(f'Orignal contracted power : {tuple(round(val) for val in original)}\nConstracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+50, Power_prices[0]+1))
-    ax.annotate(f'Undersized contracted power : {tuple(round(val) for val in not_so_much)}\nConstracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]+50, Power_prices[-1]+1))
+    ax.plot(Pena_prices, Power_prices, '+', markersize=20)
+    ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=20)
+    ax.plot(Pena_prices[-1], Power_prices[-1], '+', color='orange', markersize=20)
+    ax.plot(Pena_prices[n//2], Power_prices[n//2], 'o', color='orange', markersize=20)
+    tup = str(tuple(round(val) for val in opti)).replace(' ', '')
+    ax.annotate(f'Optimal contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[n//2]+Power_prices[n//2])} €', xy=(Pena_prices[n//2], Power_prices[n//2]), xytext=(Pena_prices[n//2]+100, Power_prices[n//2]-20))
+    tup = str(tuple(round(val) for val in original)).replace(' ', '')
+    ax.annotate(f'Original contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+100, Power_prices[0]))
+    tup = str(tuple(round(val) for val in not_so_much)).replace(' ', '')
+    ax.annotate(f'Under-contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]-230, Power_prices[-1]+50))
     ax.set_xlabel('Yearly penalization cost (€)')
     ax.set_ylabel('Yearly contracted power cost (€)')
-    ax.set_xlim(-100, 2000)
-    ax.set_ylim(550, 1500)
+    ax.set_xlim(-100, 2400)
+    ax.set_ylim(550, 1550)
     plt.show()

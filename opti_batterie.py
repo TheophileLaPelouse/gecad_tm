@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 #%%
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists, treat_data
 from representative_days import create_data, gen_new_data, separate_days
+from opti import build_model as build_model_without_bat
 
 TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
 TE = [
@@ -119,7 +120,7 @@ def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) :
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 
-def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False, Cb_param=None) :
+def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False, Cb_param=None, Pprev=None) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
@@ -137,8 +138,10 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
     model.month = pyo.RangeSet(0, 10)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
-    model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=max(Pcons))
-    
+    if Pprev is None :
+        model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=max(Pcons))
+    else :
+        model.Pprev=pyo.Param(model.period, domain=pyo.NonNegativeReals, initialize={p:Pprev[p] for p in model.period})
     # Battery
     model.Pc = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
@@ -168,9 +171,9 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
         if p == model.period.last() :
             return model.Pprev[p] >= 0
         return model.Pprev[p] <= model.Pprev[p+1]
-    model.Pprev_con = pyo.Constraint(model.period, rule=Pprev_rule)
-    
-    model.Pprev_con1 = pyo.Constraint(expr=model.Pprev[0] >= 0)
+    if not Pprev :
+        model.Pprev_con = pyo.Constraint(model.period, rule=Pprev_rule)
+        model.Pprev_con1 = pyo.Constraint(expr=model.Pprev[0] >= 0)
     
     # Battery constraints
     def max_rule(model, t) : 
@@ -233,13 +236,14 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
 
 #%% Solver 
 
-def solve(model, print_level = 7, printation=True) :
+def solve(model, print_level = 7, printation=True, tol=None) :
     solver = SolverFactory('ipopt')
     if printation :
         solver.options['print_level'] = print_level
         solver.options['print_timing_statistics'] = 'yes'
     solver.options['max_iter'] = 3000
-    # solver.options['tol'] = 1e-6
+    if tol : 
+        solver.options['tol'] = tol
     # solver.options['acceptable_tol'] = 1e-6
     solver.options['hsllib'] = '/usr/local/lib/libcoinhsl.dylib'
     # solver.options['nlp_scaling_method'] = 'none'
@@ -249,7 +253,7 @@ def solve(model, print_level = 7, printation=True) :
 # model.display()
 
 #%% Penalization variable test
-
+timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 Pena2test = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 10, 100]
 res = []
 for coef in Pena2test : 
@@ -267,6 +271,7 @@ timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
 # model = build_model(timeframe, without_bat=True)
 model = build_model(timeframe, pena=0.000001)
 Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+
 # full_date_new_simple = []
 # filled_days = set()
 # for date in full_date_new : 
@@ -290,51 +295,111 @@ Pd = [model.Pd[k].value for k in model.time]
 Cb = model.Cb.value
 res = calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month, False, printation=False)
 
-#%% Using repr days part 1
+
+#%%
+def charge_profile(model, Cb, Eautocons, Econs, full_date, TE, TP) :
+
+    Days = separate_days(Econs, Eautocons, full_date, delta=dt.timedelta(days=2, hours=23, minutes=59))
+    # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
+    Pc = []
+    Pd = []
+    lastE = 0.2
+    for k in range(0, len(Days)) : 
+        # Should be fast
+        print(k)
+        small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb, Pprev=Pprev, TE=TE, TP=TP)
+        solve(small, printation=False)
+        Pc += [small.Pc[i] for i in small.time]
+        Pd += [small.Pd[i] for i in small.time]
+        if Cb == 0 : 
+            lastE = 0
+        else  :
+            lastE = small.E[small.time.at(-1)]/Cb
+        
+    return Days, Pc, Pd
+
+def create_big(Pc, Pd, full_date, Cb) : 
+    timeframe = (full_date[0], full_date[-1])
+    big = build_model(timeframe)
+    for p in big.period : 
+        big.Pprev[p].value = model.Pprev[p].value
+    
+    big.Cb.value=Cb
+    for t in big.time :
+        big.Pc[t].value = Pc[t]
+        big.Pd[t].value = Pd[t]
+        Egrid = big.Econs[t] + (big.Pc[t]-big.Pd[t])*big.deltat - Eautocons[t]
+        Egrid = Egrid()
+        big.Egrid_plus[t].value = Egrid*(Egrid>0)
+        big.Egrid_minus[t].value = -Egrid*(Egrid<0)
+        
+        for p in big.period : 
+            Pplus = (big.Econs[t]-Eautocons[t])/big.deltat  + (big.Pc[t]-big.Pd[t]) - big.Pprev[p]
+            Pplus = Pplus()
+            big.Pplus[t, p].value = Pplus*(Pplus>0)
+            big.Pminus[t, p].value = -Pplus*(Pplus<0)
+    
+    Time, Nbdays, Time_in_month = define_time2(full_date, period_hours)
+    res = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=False)()
+    
+    return big, res
+#%% Using repr days part 1 for Tubacer
+Eautocons, Econs, full_date, deltat = treat_data()
 
 model = build_model(full_date_repr_div, definer=2, Econs=Econs_repr_div, Eautocons=Eprod_repr_div, pena=0.000001, selling=False)
 solver, results = solve(model, print_level=7)
 Cb=model.Cb.value
 Pprev = [model.Pprev[p].value for p in range(6)]
-#%% part 2
-Days = separate_days(Econs, Eautocons, full_date, delta=dt.timedelta(days=2, hours=23, minutes=59))
-# timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
-Pc = []
-Pd = []
-lastE = 0.2
-for k in range(0, len(Days)) : 
-    # Should be fast
-    print(k)
-    small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb)
-    solve(small, printation=False)
-    Pc += [small.Pc[i] for i in small.time]
-    Pd += [small.Pd[i] for i in small.time]
-    lastE = small.E[small.time.at(-1)]/Cb
+#%% Part 2
+Days, Pc, Pd = charge_profile(model, Cb, Eautocons, Econs, full_date)  
+#%% Part 3
+big, res = create_big(Pc, Pd, full_date, Cb) 
+#%% Bat values test
+Res = {}
+Cbs = [0, 10, 20, 30, 40, 50, 60, 70]
+for Cb in Cbs : 
+    Days, Pc, Pd = charge_profile(model, Cb, Eautocons, Econs, full_date) 
+    big, res = create_big(Pc, Pd, full_date, Cb) 
+    Res[Cb] = big.obj()
     
+fig, ax = plt.subplots()
+ax.plot(Cbs, [Res[Cb] for Cb in Cbs], '+')
+ax.set_xlabel('Battery size (kwh)')
+ax.set_ylabel('Optimal objective function value')
+# Res = {0: 38684.487053163524,
+#  10: 42976.06675500966,
+#  20: 42353.28243364232,
+#  30: 41884.32594734423,
+#  40: 41563.33716281605,
+#  50: 41363.64479026753,
+#  60: 41266.219793633536,
+#  70: 41247.34650072234}
+#%% Final part reuse simple model to determine Pprev
 
-#%% part 3
-timeframe = (full_date[0], full_date[-1])
-big = build_model(timeframe)
+Eprod_bat = [big.Eautocons[t] for t in big.time]
+for k in range(len(Eprod_bat)) : 
+    Eprod_bat[k] += (big.Pd[k].value - big.Pc[k].value)*big.deltat
+
+Eautocons, Econs, full_time, deltat = treat_data()
+assert full_time == full_date
+big2, Time_in_month, Nbdays = build_model_without_bat(full_date, definer=2, Eautocons=Eprod_bat, Econs=Econs)
 for p in big.period : 
-    big.Pprev[p].value = model.Pprev[p].value
-
-big.Cb.value=Cb
-for t in big.time :
-    big.Pc[t].value = Pc[t]
-    big.Pd[t].value = Pd[t]
-    Egrid = big.Econs[t] + (big.Pc[t]-big.Pd[t])*big.deltat - Eautocons[t]
-    Egrid = Egrid()
-    big.Egrid_plus[t].value = Egrid*(Egrid>0)
-    big.Egrid_minus[t].value = -Egrid*(Egrid<0)
+    big2.Pprev[p].value = Pprev[p]
     
-    for p in big.period : 
-        Pplus = (big.Econs[t]-Eautocons[t])/big.deltat  + (big.Pc[t]-big.Pd[t]) - big.Pprev[p]
-        Pplus = Pplus()
-        big.Pplus[t, p].value = Pplus*(Pplus>0)
-        big.Pminus[t, p].value = -Pplus*(Pplus<0)
+before = big2.obj()
+# solver = SolverFactory('ipopt')
+# solver.options['print_timing_statistics'] = 'yes'
+# results = solver.solve(big2, tee=True)
 
-Time, Nbdays, Time_in_month = define_time2(full_date, period_hours)
-res = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=True)
+solve(big2, tol=1e-16)
+new_Pprev = [big2.Pprev[k].value for k in range(6)]
+obj = big2.obj()
+
+for p in big.period : 
+    big.Pprev[p].value = new_Pprev[p]
+res2 = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=False)
+
+# Not working well and anyway does not seem useful before =38808, obj = 38783 (-30€ < -0.1%)
 
 #%% Bat_price influence 
 obj = []

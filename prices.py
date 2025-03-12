@@ -188,6 +188,16 @@ def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dad
         
     print("OK5")
     return Eautocons, Econs, full_date, deltat
+
+def increase_deltat(n, Eautocons, Econs, full_date, deltat) : 
+    full_date_new = [full_date[k] for k in range(0, len(full_date), n)]
+    Econs_new = []
+    Eautocons_new = []
+    for k in range(0, len(full_date), n) : 
+        Econs_new.append(sum(Econs[k:k+n]))
+        Eautocons_new.append(sum(Eautocons[k:k+n]))
+    return Eautocons_new, Econs_new, full_date_new, deltat*n
+    
 #%%
 Eautocons, Econs, full_date, deltat = treat_data()
 # Econs = series2lists(df['TUBACER KWh'])
@@ -236,7 +246,7 @@ if texto_elements :
                 None_working_days.append(dt.datetime(int(year), current_month, date))
                 None_working_days_2023.append(dt.datetime(int(year)-1, current_month, date))
         k += 1
-    
+#%%
 period_hours = [[[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], [(0, 8)]], 
               [[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], [(0, 8)]],
               [[], [(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [(0, 8)]],
@@ -250,6 +260,49 @@ period_hours = [[[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], 
               [[], [(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [(0, 8)]],
               [[(9, 14), (18, 22)], [(8, 9), (14, 18), (22, 24)], [], [], [], [(0, 8)]]
               ]
+
+if __name__ == '__main__' :
+    columns = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    index = range(24)
+    df_p = pd.DataFrame(columns=columns, index=index)
+    for month in range(len(period_hours)) :
+        print()
+        print(month)
+        month_val = period_hours[month]
+        for i in range(len(month_val)) : 
+            print(i, month_val[i])
+            for tup in month_val[i] : 
+                for k in range(tup[0], tup[1]) : 
+                    df_p.loc[k, columns[month]] = "P%d" % (i+1)
+    index = [str(val)+'-'+str(val+1) for val in index]
+    df_p.index = index
+    
+    def style_periods(val):
+        color = ''
+        if val == 'P1':
+            color = 'coral'
+        elif val == 'P2':
+            color = 'orange'
+        elif val == 'P3':
+            color = 'yellow'
+        elif val == 'P4':
+            color = 'lightyellow'
+        elif val == 'P5':
+            color = 'cyan'
+        elif val == 'P6':
+            color = 'lightgrey'
+        return f'background-color: {color}'
+
+    styled_df = df_p.style.applymap(style_periods).set_properties(**{'text-align': 'center'}).set_table_styles([
+        {'selector': 'thead th', 'props': [('font-size', '12pt'), ('font-weight', 'bold'), ('text-align', 'center'), ('border-bottom', '2px solid black'), ('width', '100px')]},
+        {'selector': 'tbody td', 'props': [('border', '1px solid black'), ('padding', '5px'), ('width', '100px')]},
+        {'selector': 'tbody tr:nth-child(even)', 'props': [('background-color', '#f2f2f2')]},
+        {'selector': 'tbody tr:hover', 'props': [('background-color', '#e0e0e0')]}
+    ])
+
+    styled_df.to_html('test.html')
+        
+#%%
 
 period_hours_20 = [[[(10, 14), (18, 22)], [(8, 10), (14, 18), (22, 24)], [0, 8]] for k in range(12)]
 """
@@ -329,6 +382,7 @@ def search_dico(l, val, deb_or_fin = 'deb') :
     fin = len(l) - 1
     while fin - deb > 1 : 
         mid = (deb + fin)//2
+        print(l[mid])
         if l[mid] == val : 
             return mid 
         elif l[mid] > val : 
