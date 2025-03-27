@@ -7,26 +7,16 @@ from pyomo.opt import SolverFactory
 import os 
 import matplotlib.pyplot as plt
 import pandas as pd
+import json
+plt.rcParams['font.size'] = 12
 
 #%%
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists, treat_data
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, series2lists, treat_data, increase_deltat
 from representative_days import create_data, gen_new_data, separate_days
 from opti import build_model as build_model_without_bat
 
-TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
-TE = [
-      [0.176631, 0.170670, 0, 0, 0, 0.125919], 
-      [0.126656, 0.131860, 0, 0, 0, 0.092685], 
-      [0, 0.126656, 0.131860, 0, 0, 0.073864], # March is not in the invoices so the figures are based on february
-      [0, 0, 0, 0.066662, 0.079025, 0.073864], 
-      [0, 0, 0, 0.079119, 0.094265, 0.097955], 
-      [0, 0, 0.124591, 0.143611, 0, 0.138129], 
-      [0.150950, 0.179345, 0, 0, 0, 0.148744], 
-      [0, 0, 0.165865, 0.181045, 0, 0.169511], 
-      [0, 0, 0.145440, 0.167703, 0, 0.150691], 
-      [0, 0, 0, 0.137424, 0.169721, 0.133218], 
-      [0, 0.195679, 0.210640, 0, 0, 0.172424]
-      ]
+from prices_tubacer import TE, TP 
+from prices_porto_motor import TE_pm_2024, TP_pm_2024
 
 # For the moment, for the battery we will take values that looks ok, but with not so many reasearch behind.
 
@@ -57,6 +47,17 @@ Econs_repr_div = series2lists(df['Econs'])
 Eprod_repr_div = series2lists(df['Eprod'])
 full_date_repr_div = [df['full_date'][k] for k in range(len(df['full_date']))]
 
+
+path_repr_pm = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'best_repr_TM_max.csv')
+if not os.path.exists(path_repr_pm) :
+    raise ValueError('You must run opti.search_best_repr first')
+    
+df = pd.read_csv(path_repr_pm, sep=';', parse_dates=['full_date'])
+Econs_repr_pm = series2lists(df['Econs'])
+Eprod_repr_pm = series2lists(df['Eprod'])
+full_date_repr_pm = [df['full_date'][k] for k in range(len(df['full_date']))]
+
+
 #%% Model construction
 def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, selling, opti = True, printation=False) :
     Se = 0
@@ -75,8 +76,8 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
             while t not in Time_in_month[m] : 
                 m+=1
             Se += TE[m][p]*model.Egrid_plus[t]
-            if printation :
-                print("Buying price", t, TE[m][p]*model.Egrid_plus[t]())
+            # if printation :
+            #     print("Buying price", t, TE[m][p]*model.Egrid_plus[t]())
             if selling :
                 Se -= TE[m][p]*model.Egrid_minus[t]/2
             # Se += TE[m][p]*model.Egrid_minus[t]
@@ -89,26 +90,33 @@ def calculate_price(model, deltat, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_i
         for m in range(12) : 
             Spena_P[m][p] = Spena_P[m][p]**(1/2)
         Spena += Kp[p]*tep*sum(Spena_P[m][p] for m in range(12))
-        if printation :
-            if isinstance(Spena_P[p], float) : 
-                print("Spena_P", Spena_P[p])
-                print("Spena[p]", p, Kp[p]*tep*Spena_P[p])
-            else : 
-                print("Spena_P", Spena_P[p]())
-                print("Spena[p]", p, (Kp[p]*tep*Spena_P[p])())
+        # if printation :
+        #     if isinstance(Spena_P[p], float) : 
+        #         print("Spena_P", Spena_P[p])
+        #         print("Spena[p]", p, Kp[p]*tep*Spena_P[p])
+        #     else : 
+        #         print("Spena_P", Spena_P[p])
+        #         print("Spena[p]", p, (Kp[p]*tep*Spena_P[p]()))
     if printation : 
         print("Se", Se())
         print("Seauto", Seauto)
         print("Spena", Spena())
         print("Sp", Sp())
+        print("TE", [TE[val] for val in TE])
     return Se + Seauto + Spena + Sp
 
-def battery_price(Cb, nbdays, bat_price=359/10+0.019) :
+def battery_price(Cb, nbdays, bat_price=359, i=0.1, n=10, eps=0.002) :
+    # i = discount rate
+    # n lifetime
+    # eps = service coefficient 
     # investment = 359 $/kwh/year, maintenance = 0.019$/kwh/year, lifetime = 9 years
+    bat_price=bat_price*((i*(1+i)**n)/((1+i)**n-1))+bat_price*eps
     return Cb*bat_price*nbdays/365
     # return 0
     
 def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) : 
+    if coef == 'tot' : 
+        return 0
     if Pd is None :
         return coef*sum(p for p in Pc)
     else : 
@@ -120,10 +128,10 @@ def pena_charge_and_discharge(Pc, Pd, time=None, coef=0.1) :
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 
-def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359/10+0.019, selling=False, Cb_param=None, Pprev=None) :
+def build_model(timeframe, full_date=full_date, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, without_bat = False, bat_price=359, selling=False, Cb_param=None, Pprev=None) :
     Pcons = [val/0.25 for val in Econs]
     if definer == 1 :
-        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
+        Time, Nbdays, Time_in_month = define_time(timeframe, period_hours, full_date)
         Nbdays += 1
         timerange = (min(min(t) if t else 999999999 for t in Time), max(max(t) if t else 0 for t in Time))
     elif definer == 2 :
@@ -147,7 +155,7 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
     model.Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     # model.notPc_Pd = pyo.Var(model.time, domain=pyo.NonNegativeReals, initialize=0)
     model.E = pyo.Var(model.time, domain=pyo.NonNegativeReals)
-    if Cb_param : 
+    if Cb_param is not None : 
         model.Cb = pyo.Param(domain=pyo.NonNegativeReals, initialize=Cb_param)
     else : 
         model.Cb = pyo.Var(domain = pyo.NonNegativeReals)
@@ -179,7 +187,7 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
     def max_rule(model, t) : 
         return model.E[t] <= model.Cb
     def min_rule(model, t) : 
-        return model.E[t] >= SOC0*model.Cb
+        return model.E[t] >= 0.2*model.Cb
     model.capacity_con_max = pyo.Constraint(model.time, rule=max_rule)
     model.capacity_con_min = pyo.Constraint(model.time, rule=min_rule)
     
@@ -193,10 +201,12 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
     def battery_rule(model, t) : 
         if t == model.time.first() : 
             # return model.E[t] == (0.2*model.Cb + model.Cb)/2
-            return model.E[t] == 0.2*model.Cb
+            return model.E[t] == SOC0*model.Cb
             # return model.E[t] == 5
         return model.E[t] == model.E[t-1] + (Effc*model.Pc[t] - model.Pd[t]/Effd)*model.deltat
     model.battery_con = pyo.Constraint(model.time, rule=battery_rule)
+    
+    model.batteruy_last_val = pyo.Constraint(expr=(model.E[model.time.at(-1)]>=0.45*model.Cb))
     
     def Egrid_rule(model, t) : 
         return model.Egrid_plus[t] - model.Egrid_minus[t] == model.Econs[t] + (model.Pc[t]-model.Pd[t])*model.deltat - Eautocons[t]
@@ -218,9 +228,10 @@ def build_model(timeframe, SOC0=0.2, pena=0.1, definer=1, charge_rate=0.5, decha
         return model.Pplus[t, p]*model.Pminus[t, p]==0
     # model.Pgrid_con = pyo.Constraint(model.time, model.period, rule=Pgrid_mult_rule)
     
-    # def charge_discharge_rule(model, t) : 
-    #     return(model.Pc[t]*model.Pd[t]==0)
-    # model.notPC_Pd = pyo.Constraint(model.time, rule=charge_discharge_rule)
+    if pena=='tot' : 
+        def charge_discharge_rule(model, t) : 
+            return(model.Pc[t]*model.Pd[t]==0)
+        model.notPC_Pd = pyo.Constraint(model.time, rule=charge_discharge_rule)
     
     if without_bat : 
         model.no_bat = pyo.Constraint(expr=model.Cb==0)
@@ -297,30 +308,49 @@ res = calculate_price(model, model.deltat, model.TP, model.TE, model.TEauto, mod
 
 
 #%%
-def charge_profile(model, Cb, Eautocons, Econs, full_date, TE, TP) :
+def charge_profile(model, Cb, Pprev, Eautocons, Econs, full_date, TE, TP, bat_price=359) :
 
     Days = separate_days(Econs, Eautocons, full_date, delta=dt.timedelta(days=2, hours=23, minutes=59))
     # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
     Pc = []
     Pd = []
+    Ebat = []
     lastE = 0.2
+    Ec = 0
     for k in range(0, len(Days)) : 
         # Should be fast
+        print()
         print(k)
-        small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb, Pprev=Pprev, TE=TE, TP=TP)
-        solve(small, printation=False)
-        Pc += [small.Pc[i] for i in small.time]
-        Pd += [small.Pd[i] for i in small.time]
+        print('Cb', Cb)
+        print('lastE', lastE)
+        print('sumPd', sum(Pd))
+        print('sumPc', sum(Pc))
+        
+        small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb, Pprev=Pprev, TE=TE, TP=TP, bat_price=bat_price, pena=10)
+        Ec = Ec + sum(small.Econs[t] for t in small.time)
+        print('sum Econs', Ec)
+        print(small.Cb)
+        try : 
+            solve(small, printation=False)
+        except : 
+            print("ça a loupé")
+            small = build_model(Days[k]['date'], SOC0=lastE, definer=2, Econs=Days[k]['Econs'], Eautocons=Days[k]['Eprod'], Cb_param=Cb, Pprev=Pprev, TE=TE, TP=TP, bat_price=bat_price, pena=0.1)
+            solve(small, printation=True)
+        print('pena price', pena_charge_and_discharge([small.Pc[i].value for i in small.time], [small.Pd[i].value for i in small.time], coef=1))
+        print('Cb2', small.Cb.value)
+        Pc += [small.Pc[i].value for i in small.time]
+        Pd += [small.Pd[i].value for i in small.time]
+        Ebat += [small.E[i].value for i in small.time]
         if Cb == 0 : 
             lastE = 0
         else  :
-            lastE = small.E[small.time.at(-1)]/Cb
+            lastE = (small.E[small.time.at(-1)]/Cb)()
         
-    return Days, Pc, Pd
+    return Days, Pc, Pd, Ebat
 
-def create_big(Pc, Pd, full_date, Cb) : 
+def create_big(Pc, Pd, Ebat, Cb, Pprev, Eautocons, Econs, full_date, TE, TP, bat_price=359) : 
     timeframe = (full_date[0], full_date[-1])
-    big = build_model(timeframe)
+    big = build_model(timeframe, Econs=Econs, Eautocons=Eprod, TE=TE, TP=TP, bat_price=bat_price)
     for p in big.period : 
         big.Pprev[p].value = model.Pprev[p].value
     
@@ -328,6 +358,7 @@ def create_big(Pc, Pd, full_date, Cb) :
     for t in big.time :
         big.Pc[t].value = Pc[t]
         big.Pd[t].value = Pd[t]
+        big.E[t].value = Ebat[t]
         Egrid = big.Econs[t] + (big.Pc[t]-big.Pd[t])*big.deltat - Eautocons[t]
         Egrid = Egrid()
         big.Egrid_plus[t].value = Egrid*(Egrid>0)
@@ -340,32 +371,49 @@ def create_big(Pc, Pd, full_date, Cb) :
             big.Pminus[t, p].value = -Pplus*(Pplus<0)
     
     Time, Nbdays, Time_in_month = define_time2(full_date, period_hours)
-    res = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=False)()
+    res = calculate_price(big, big.deltat, big.TP, big.TE, big.TEauto, big.Time, big.tep, big.Kp, 323, Time_in_month, False, printation=True)()
     
     return big, res
-#%% Using repr days part 1 for Tubacer
-Eautocons, Econs, full_date, deltat = treat_data()
 
+
+#%% Using repr days part 1 for Tubacer
+# Eautocons, Econs, full_date, deltat = treat_data()
+pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
+Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+                                                 format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+deltat = deltat[0]
+Eprod, Econs, full_date, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat)
+#%%
 model = build_model(full_date_repr_div, definer=2, Econs=Econs_repr_div, Eautocons=Eprod_repr_div, pena=0.000001, selling=False)
+bat_price=190
+# model = build_model(full_date_repr_pm, definer=2, Econs=Econs_repr_pm, Eautocons=Eprod_repr_pm, TE=TE_pm_2024, TP=TP_pm_2024, pena=0.001, selling=False, bat_price=bat_price)
+
 solver, results = solve(model, print_level=7)
 Cb=model.Cb.value
 Pprev = [model.Pprev[p].value for p in range(6)]
 #%% Part 2
-Days, Pc, Pd = charge_profile(model, Cb, Eautocons, Econs, full_date)  
+# Cb=0
+Days, Pc, Pd, Ebat = charge_profile(model, Cb, Pprev, Eprod, Econs, full_date, TE_pm_2024, TP_pm_2024, bat_price=bat_price)  
 #%% Part 3
-big, res = create_big(Pc, Pd, full_date, Cb) 
+big, res = create_big(Pc, Pd, Ebat, Cb, Pprev, Eprod, Econs, full_date, TE_pm_2024, TP_pm_2024, bat_price=bat_price)
+
+# Se 3984.5659066021162
+# Seauto 0
+# Spena 0.00010795304922806789
+# Sp 602.3755752478291
 #%% Bat values test
 Res = {}
-Cbs = [0, 10, 20, 30, 40, 50, 60, 70]
+Cbs = [0, 10, 15, 16.1, 20, 30, 40, 50, 60, 70]
 for Cb in Cbs : 
-    Days, Pc, Pd = charge_profile(model, Cb, Eautocons, Econs, full_date) 
-    big, res = create_big(Pc, Pd, full_date, Cb) 
+    Days, Pc, Pd, Ebat = charge_profile(model, Cb, Pprev, Eprod, Econs, full_date, TE_pm_2024, TP_pm_2024, bat_price=190) 
+    big, res = create_big(Pc, Pd, Ebat, Cb, Pprev, Eprod, Econs, full_date, TE_pm_2024, TP_pm_2024, bat_price=190) 
     Res[Cb] = big.obj()
     
 fig, ax = plt.subplots()
 ax.plot(Cbs, [Res[Cb] for Cb in Cbs], '+')
 ax.set_xlabel('Battery size (kwh)')
 ax.set_ylabel('Optimal objective function value')
+# Tubacer 
 # Res = {0: 38684.487053163524,
 #  10: 42976.06675500966,
 #  20: 42353.28243364232,
@@ -374,6 +422,41 @@ ax.set_ylabel('Optimal objective function value')
 #  50: 41363.64479026753,
 #  60: 41266.219793633536,
 #  70: 41247.34650072234}
+
+# PM opti : 5743.539192368027, Cb=10.550895667461326
+# {0: 8582.358261079064,
+#  10: 8212.369599695057,
+#  20: 8389.374759788827,
+#  30: 8284.293013731369,
+#  40: 8616.13115398514,
+#  50: 9160.322028795279,
+#  60: 9434.322018770821,
+#  70: 9710.286782811387}
+
+#%% Test with varying prices 
+
+Results_bat_price = {}
+Cbs_prices = [k for k in range(280, 360, 10)]
+Eprod=Eautocons
+for price in Cbs_prices[:] : 
+    if price==280 : 
+        price+=0.001
+    model = build_model(full_date_repr_div, definer=2, Econs=Econs_repr_div, Eautocons=Eprod_repr_div, pena=0.000001, selling=False, bat_price=price+0.01)
+    solver, results = solve(model, print_level=7)
+    Cb=model.Cb.value
+    Pprev = [model.Pprev[p].value for p in range(6)]
+    
+    Days, Pc, Pd, Ebat = charge_profile(model, Cb, Pprev, Eprod, Econs, full_date, TE, TP, bat_price=price)  
+    big, res = create_big(Pc, Pd, Ebat, Cb, Pprev, Eprod, Econs, full_date, TE, TP, bat_price= price) 
+    
+    Results_bat_price[price] = {'obj':big.obj(), 'res':res, 'Cb':Cb, 'Pc':Pc, 'Pd':Pd, 'Ebat' : Ebat}
+
+    path=os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price_Tub2.json')
+    with open(path, "w") as f : 
+        f.write(json.dumps(Results_bat_price))
+    
+    
+
 #%% Final part reuse simple model to determine Pprev
 
 Eprod_bat = [big.Eautocons[t] for t in big.time]
@@ -457,26 +540,36 @@ plt.legend()
 plt.plot()
 
 #%% Test temps de calcul
-# import time
-# t0 = dt.datetime(2024, 4, 1, 0, 0)
-# t1 = t0+dt.timedelta(hours=24)
-# times = []
-# n = 30
-# for k in range(n) : 
-#     tic = time.time()
-#     t1 += dt.timedelta(hours = 12)
-#     model = build_model((t0, t1))
-#     solver, results = solve(model, 0)
-#     times.append(time.time()-tic)
-    
-# #%%
-# import numpy as np
+import time
+t0 = dt.datetime(2024, 4, 1, 0, 0)
+t1 = t0+dt.timedelta(hours=24)
+n = 70
+timeframes = [(t0, t0 + dt.timedelta(hours = 24) + k*dt.timedelta(hours = 12)) for k in range(n)]
+times = []
 
-# # On vérifie si on a une tendance polynomiale
-# p = np.polyfit(range(n), times, 2)
-# f = lambda x : p[0]*x**2 + p[1]*x + p[2]
-# plt.plot(range(n), times)
-# plt.plot(range(n), [f(k) for k in range(n)])
+for timeframe in timeframes[:] : 
+    tic = time.time()
+    t1 += dt.timedelta(hours = 12)
+    model = build_model(timeframe, pena=0.0001)
+    solver, results = solve(model)
+    # try : solver, results = solve(model)
+    # except : 
+    #     model = build_model(timeframe, pena=0.0001)
+    #     solve(model)
+        
+    times.append(time.time()-tic)
+    
+with open(os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'time.json'), 'w') as f:
+    f.write(json.dumps(times))
+    
+#%%
+import numpy as np
+
+# On vérifie si on a une tendance polynomiale
+p = np.polyfit(range(n), times, 2)
+f = lambda x : p[0]*x**2 + p[1]*x + p[2]
+plt.plot(range(n), times, '+')
+plt.plot(range(n), [f(k) for k in range(n)])
 
 #%% Test representative days month per month
 

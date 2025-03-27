@@ -1,3 +1,10 @@
+"""
+This file is written as a python Notebook (but can be imported in other files), each cells are delimited 
+by the #%% symbole, then a title explains what the cell does.
+"""
+
+
+
 
 import datetime as dt
 import calendar as cal
@@ -8,16 +15,17 @@ import os
 from numpy.random import rand
 import matplotlib.pyplot as plt 
 import pandas as pd
+# Define the font size for the plots
 plt.rcParams['font.size'] = 20
 
-#%%
-from prices import define_time, treat_data, TEauto, tep, Kp, period_hours, Eautocons, Econs, full_date, deltat, define_time2, series2lists
+#%% import values and function from the data treatment 
+from prices import define_time, treat_data, TEauto, tep, Kp, period_hours, Eautocons, Econs, full_date, deltat, define_time2, series2lists, increase_deltat
 from representative_days import create_data, gen_new_data
 from prices_tubacer import TE, TE_new, TP, TP_new
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
 # full_time = full_date
 
-#%% representative days 
+#%% load representative days 
 
 if __name__ == '__main__' :
     
@@ -42,35 +50,42 @@ if __name__ == '__main__' :
 
 #%% Model construction
 
+# Objective function of the problem, can also be called outside of the optimisation if we want to print stuff or evaluate a model in its current step
 def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, Time_in_month, deltat, opti = True, printation=False, sep_pena=False) :
-    # For it to be faster, we could rewrite this function in a C code and import it 
-    # -> it should speed up the evaluation of the objective function
-    # Here optimization is fast so not necessary
+
     Se = 0
     Seauto = 0
     Spena = 0
     Sp = 0
     Se_p = [0 for k in range(6)]
+    # Initialize the penalization at a bit more than 0 because square not differentiable 2 times in 0
     Spena_P = [[0.000000001 for k in range(6)] for i in range(12)]
+    
+    # Sum over p
     for p in range(len(TP)) :
-        Sp += TP[p]*Pprev[p]*Nbdays
+        Sp += TP[p]*Pprev[p]*Nbdays # Power cost
         # print("power", TP[p], Pprev[p](), Nbdays, (TP[p]*Pprev[p]*Nbdays)())
         if opti :  
             time_table = Time[p].value 
         else :
             time_table = Time[p]
+        # Sum over t, separating the months 
         for t in time_table: 
             m = 0 
             while t not in Time_in_month[m] : 
                 m+=1
             # Se += TE[m][p]*(Econs[t]-Eautocons[t])
-            Se += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
+            Se += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2 # Energy cost
             Se_p[p] += TE[m][p]*((Econs[t]-Eautocons[t]) + abs(Econs[t]-Eautocons[t]))/2
             # Seauto += TEauto[p]*Eautocons[t]
+            
+            # The penalisation cost is separated for each month
             Spena_P[m][p] += ((Pcons[t]-Eautocons[t]/deltat - Pprev[p] + abs(Pcons[t]-Eautocons[t]/deltat - Pprev[p]))/2)**2 
             
             # x+abs(x) = 2x if x>0, x+abs(x) = 0 if x < 0
         # if printation :print("Spena_p", Kp[p], tep, (Spena_P[p])(), (Kp[p]*tep*Spena_P[p])())
+        
+        # Compute penalization final parts
         for m in range(12) : 
             Spena_P[m][p] = Spena_P[m][p]**(1/2)
         Spena += Kp[p]*tep*sum(Spena_P[m][p] for m in range(12))
@@ -80,9 +95,11 @@ def calculate_price(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, K
         print("Spena", Spena())
         print("Sp",Sp, Sp())
     if sep_pena :
+        # For showing results
         return (Se + Seauto + Spena + Sp), Spena, Se, Sp
     return Se + Seauto + Spena + Sp
 
+# Function for calculating objective function using representative days that can represent several days 
 def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp, Nbdays, nb_repr, Time_in_month, deltat, opti = True, printation=False) :
     Se = 0
     Seauto = 0
@@ -122,8 +139,11 @@ def biased_prices(Pprev, Pcons, Econs, Eautocons, TP, TE, TEauto, Time, tep, Kp,
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 20, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 30, 23, 59))
 # timeframe =(dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 1, 30, 23, 59))
-def build_model(timeframe, full_date=full_date, definer=1, charge_rate=0.5, decharge_rate=0.5, Effc=0.95, Effd=0.95, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
+
+# Function that defines the optimization model
+def build_model(timeframe, full_date=full_date, definer=1, Econs=Econs, Eautocons=Eautocons, TP=TP, TE=TE, TEauto=TEauto, tep=tep, Kp=Kp, period_hours=period_hours, deltat=deltat, biased=False, nb_repr=[], Nbdays_forced=None) :
     Pcons = [val/deltat for val in Econs]
+    # Defining the time variable that will be needed 
     if definer == 1 :
         Time, Nbdays, Time_in_month = define_time(timeframe, period_hours, full_date=full_date)
         Nbdays += 1
@@ -138,15 +158,18 @@ def build_model(timeframe, full_date=full_date, definer=1, charge_rate=0.5, dech
         Nbdays = Nbdays_forced
     model = pyo.ConcreteModel()
     
+    # Defining the set for indexing
     model.period = pyo.RangeSet(0, len(TP)-1)
     month0 = timeframe[0].month -1
     month1 = timeframe[-1].month - 1
     model.month = pyo.RangeSet(month0, month1)
     model.time = pyo.RangeSet(timerange[0], timerange[1])
     
+    # Contracted values variables 
     model.Pprev = pyo.Var(model.period, domain=pyo.NonNegativeReals, initialize=[120, 130, 130, 130, 130, 195])
     # model.P_minus_P = pyo.Var(model.period, model.time, domain=pyo.NonNegativeReals, initialize = 0)
     
+    # Parameters 
     model.Pcons = pyo.Param(model.time, initialize={t: Pcons[t] for t in model.time})
     model.Econs = pyo.Param(model.time, initialize={t: Econs[t] for t in model.time})
     model.Eautocons = pyo.Param(model.time, initialize={t: Eautocons[t] for t in model.time})
@@ -158,12 +181,15 @@ def build_model(timeframe, full_date=full_date, definer=1, charge_rate=0.5, dech
     model.Kp = pyo.Param(model.period, initialize={p : Kp[p] for p in model.period})
     
     # model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.P_minus_P, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays))
+    
+    # Objective function 
     if biased and nb_repr: 
         model.obj = pyo.Objective(expr=biased_prices(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, nb_repr, Time_in_month, deltat))
     else :    
         if biased : print("You forgot the nb_repr list")
         model.obj = pyo.Objective(expr=calculate_price(model.Pprev, model.Pcons, model.Econs, model.Eautocons, model.TP, model.TE, model.TEauto, model.Time, model.tep, model.Kp, Nbdays, Time_in_month, deltat))
     
+    # Constraints, the constraints is defined using the Pprev_rule function as a rule.
     def Pprev_rule(model, p) : 
         if p == model.period.last() :
             return model.Pprev[p] >= 0
@@ -175,9 +201,9 @@ def build_model(timeframe, full_date=full_date, definer=1, charge_rate=0.5, dech
     return model, Time_in_month, Nbdays
 
 
-#%% Compare days choices 
+#%% Compare days choices (typical days related)
 
-def test_method(number_rand=10, number_coef=10, n_init=5) : 
+def test_method(number_rand=10, number_coef=10, n_init=5, Econs=Econs, Eautocons=Eautocons) : 
     """
     We will observe two things to test the interest of the methods.
     
@@ -200,9 +226,9 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
             r = rand()
             coef = 0.5+r*1.5
             Econs_test, Eprod_test = gen_new_data(Econs, Eautocons, coef_rand=0, coef_Econs=coef, coef_Eprod=coef)
-        Econs_new1, Eprod_new1, full_date_new1, days1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
-        Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="year", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test, forced_timeframe=timeframe)
-        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+        Econs_new1, Eprod_new1, full_date_new1, days1, nb_repr1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
+        Econs_new2, Eprod_new2, full_date_new2, days2, nb_repr2 = create_data(method="year", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test, forced_timeframe=timeframe)
+        Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
         
         model1, Time_in_month1, Nbdays1 = build_model(full_date_new1, definer=2, Econs=Econs_new1, Eautocons=Eprod_new1)
         model2, Time_in_month2, Nbdays2 = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2)
@@ -252,9 +278,9 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
     Econs_test=Econs 
     Eprod_test=Eautocons
     
-    Econs_new1, Eprod_new1, full_date_new1, days1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
-    Econs_new2, Eprod_new2, full_date_new2, days2 = create_data(method="kmean_max", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
-    Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+    Econs_new1, Eprod_new1, full_date_new1, days1, nb_repr1 = create_data(method="quantile", Econs=Econs_test, Eprod=Eprod_test)
+    Econs_new2, Eprod_new2, full_date_new2, days2, nb_repr2 = create_data(method="kmean_max", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
+    Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr3 = create_data(method="kmean_barycenter", n_init=n_init, Econs=Econs_test, Eprod=Eprod_test)
     
     model1, Time_in_month1, Nbdays1 = build_model(full_date_new1, definer=2, Econs=Econs_new1, Eautocons=Eprod_new1)
     model2, Time_in_month2, Nbdays2 = build_model(full_date_new2, definer=2, Econs=Econs_new2, Eautocons=Eprod_new2)
@@ -288,21 +314,21 @@ def test_method(number_rand=10, number_coef=10, n_init=5) :
     plt.show()
     return results_test_coef, results_test_rand, FIG
 
-def search_best_repr(wanted=50, path='Results/csv/best_repr.csv') : 
+def search_best_repr(Econs, Eprod, TE, TP, wanted=50, path='Results/csv/best_repr.csv') : 
     Econs_save = []
     Eprod_save = []
     full_date_save = []
     score = 1
     timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
-    model_year, Time_in_month, Nbdays = build_model(timeframe)
+    model_year, Time_in_month, Nbdays = build_model(timeframe, Econs=Econs, Eautocons=Eautocons, TE=TE, TP=TP)
     obj_max_ref = model_year.obj()
     solver = SolverFactory('ipopt')
     results_ref = solver.solve(model_year, tee=True)
     obj_ref = model_year.obj()
     
     for k in range(20) : 
-        Econs_new3, Eprod_new3, full_date_new3, days3 = create_data(method="year", n_init=1, nb_days=36, forced_timeframe=timeframe, wanted=wanted)
-        model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3)
+        Econs_new3, Eprod_new3, full_date_new3, days3, nb_repr3 = create_data(method="kmean_max", n_init=1, nb_days=5, forced_timeframe=timeframe, wanted=wanted, Econs=Econs, Eprod=Eprod)
+        model3, Time_in_month3, Nbdays3 = build_model(full_date_new3, definer=2, Econs=Econs_new3, Eautocons=Eprod_new3, TE=TE, TP=TP)
         score_max = abs(model3.obj()-obj_max_ref)/obj_max_ref
         results3 = solver.solve(model3, tee=True)
         obj3 = model3.obj()*Nbdays/Nbdays3
@@ -426,10 +452,10 @@ def new_test(wanted=50, path="Results/csv/best_repr_div.csv", Econs=Econs, Eprod
 #%% Simple solve over the year 
 
 if __name__ == '__main__' :
-    # timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
-    timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
+    timeframe = (dt.datetime(2023, 1, 1, 0, 0), dt.datetime(2023, 11, 10, 23, 59))
+    # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
     # model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024)
-    model_year, Time_in_month, Nbdays_year = build_model(timeframe, full_date=full_time)
+    model_year, Time_in_month, Nbdays_year = build_model(timeframe, full_date=full_date, Econs=Econs, Eautocons=Eautocons, deltat=deltat, TE=TE_pm_2024, TP=TP_pm_2024)
     res0 = model_year.obj()
     solver = SolverFactory('ipopt')
     solver.options['print_timing_statistics'] = 'yes'
@@ -437,13 +463,13 @@ if __name__ == '__main__' :
     Pprev = [model_year.Pprev[k].value for k in range(6)]
     res = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)
 
-#%%
+#%% Define Porto motor values
 if __name__=='__main__' : 
-    pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
-    Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+    pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2023.xlsx')
+    Eautocons, Econs, full_date, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                      format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
     deltat = deltat[0]
-
+    # Eautocons, Econs, full_date, deltat = increase_deltat(3, Eautocons, Econs, full_date, deltat)
 #%% Solver 
 if __name__ == '__main__' :
     TE_test = [[0 for k in range(6)] for i in range(11)]
@@ -639,8 +665,9 @@ if __name__ == '__main__' :
 if __name__ == '__main__' : 
     
     Eautocons, Econs, full_time, deltat = treat_data(name="TUBACER")
+    timerange = (full_time[0], dt.datetime(2024, 10, 31, 23, 59))
 
-    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE, TP=TP, Econs=Econs, Eautocons=Eautocons)
+    model_year, Time_in_month, Nbdays_year = build_model(timerange, full_date=full_time, TE=TE, TP=TP, Econs=Econs, Eautocons=Eautocons)
     res0 = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)()
     solver = SolverFactory('ipopt')
     solver.options['print_timing_statistics'] = 'yes'
@@ -690,8 +717,9 @@ if __name__ == '__main__' :
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
     full_date = full_time
     deltat = deltat[0]
+    timerange = (full_time[0], dt.datetime(2024, 10, 31, 23, 59))
     
-    model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons, deltat=deltat)
+    model_year, Time_in_month, Nbdays_year = build_model(timerange, full_date=full_time, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons, deltat=deltat)
     res0 = calculate_price(model_year.Pprev, model_year.Pcons, model_year.Econs, model_year.Eautocons, model_year.TP, model_year.TE, model_year.TEauto, model_year.Time, model_year.tep, model_year.Kp, Nbdays_year, Time_in_month, deltat, printation=True)()
     solver = SolverFactory('ipopt')
     solver.options['print_timing_statistics'] = 'yes'

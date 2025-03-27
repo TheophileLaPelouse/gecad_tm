@@ -193,7 +193,7 @@ def produce_results(full_date, TE, TP, Econs, Eprod, deltat, original, opti_prev
     # results = results.round(3)
 
     # results.to_csv(csv_path, sep=';', index=False)
-    
+    print('Prices ; opti price', original_price, price)
     return results, decrease, model
 
 
@@ -396,7 +396,7 @@ for comp in Values :
                 Values[comp][year]['mean_Eprod'] = mean_Eprod
                 
 
-plt.rcParams['font.size'] = 12
+plt.rcParams['font.size'] = 9
 
 fig, axs = plt.subplots(2, 2)
 
@@ -408,7 +408,9 @@ for key in Values :
         companies.append(key + ' 2024')
         
 pos = {'Tubacer 2024' : (0, 0), 'TMG 2024' : (0, 1), 'Porto Motor 2023' : (1, 0), 'Porto Motor 2024' : (1, 1)}
-        
+# Alias = {'Tubacer 2024' : 'Alpha 2024', 'Porto Motor 2023' : 'Bravo 2023'
+         # , 'Porto Motor 2024' : 'Bravo 2024', 'TMG 2024' : 'Charlie 2024'}
+Alias = {}
 for i in range(len(companies)):
     comp = companies[i]
     print(i, i//2, i%2)
@@ -429,7 +431,7 @@ for i in range(len(companies)):
     ax.plot(t, mean_Econs, label='Mean Consumption')
     if any(mean_Eprod) : 
         ax.plot(t, mean_Eprod, label='Mean Production')
-    ax.set_title(comp + ' ' + year)
+    ax.set_title(Alias.get(comp + ' ' + year, comp + ' ' + year))
     ax.set_xlabel('Hour of the day')
     ax.set_ylabel('Power (kW)')
     ax.legend()

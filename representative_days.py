@@ -215,23 +215,25 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
         
     return Days, during_day_stat_values
     
-def separate_days(Econs, Eprod, full_date, TE = TE, period_hours=period_hours, delta=dt.timedelta(hours=23, minutes=59)) : 
+def separate_days(Econs, Eprod, full_date, TE = TE, period_hours=period_hours, delta=dt.timedelta(hours=23, minutes=59), bat=None) : 
     if TE is not None : 
         if period_hours is None : 
             raise ValueError('Faut avoir des périodes pour les prix par contre')
             
     n = len(full_date)
     previous_date = full_date[0]
-    Days = [{'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'day_number' : 0}]
+    Days = [{'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'Ebat' : [], 'day_number' : 0}]
     for k in range(n) : 
         date = full_date[k]
         # print(date, previous_date)
         if date - previous_date > delta :
-            Days.append({'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'day_number' : k})
+            Days.append({'Econs': [], 'Eprod': [], 'Econs_norm' : [], 'Eprod_norm' : [], 'date': [], 'price': [], 'payed': [], 'Etot': [], 'Ebat' : [], 'day_number' : k})
             previous_date = date
         Days[-1]['Econs'].append(Econs[k])
         Days[-1]['Eprod'].append(Eprod[k])
         Days[-1]['date'].append(date)
+        if bat : 
+            Days[-1]['Ebat'].append(bat[k])
         
         month = date.month
         p = 0
@@ -400,10 +402,15 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
     elif method == 'barycenter' : 
         # We need to take the 2D version of the data
         ts = np.zeros((len(Days), len(Days[0]['date']), 2))
+        to_rm = []
         for k in range(len(Days)) : 
             for i in range(len(Days[0]['date'])) :
-                ts[k, i, 0] = Days[k]['Econs'][i]
-                ts[k, i, 1] = Days[k]['Eprod'][i]
+                try : 
+                    ts[k, i, 0] = Days[k]['Econs'][i]
+                    ts[k, i, 1] = Days[k]['Eprod'][i]
+                except IndexError: 
+                    to_rm.append(k)
+        ts = np.delete(ts, to_rm, axis=0)
         km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
         clusters = km.fit_predict(ts)
         silhouette = silhouette_score(ts, clusters)
@@ -425,10 +432,15 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
     
     elif method=="random" : 
         ts = np.zeros((len(Days), len(Days[0]['date']), 2))
+        to_rm = []
         for k in range(len(Days)) : 
             for i in range(len(Days[0]['date'])) :
-                ts[k, i, 0] = Days[k]['Econs'][i]
-                ts[k, i, 1] = Days[k]['Eprod'][i]
+                try : 
+                    ts[k, i, 0] = Days[k]['Econs'][i]
+                    ts[k, i, 1] = Days[k]['Eprod'][i]
+                except IndexError: 
+                    to_rm.append(k)
+        ts = np.delete(ts, to_rm, axis=0)
         km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
         clusters = km.fit_predict(ts)
         days_by_clusters = [[] for k in range(nb_cluster)]
@@ -642,7 +654,7 @@ if __name__ == '__main__' :
 if __name__ == '__main__' :
     month= 8
     # timeframe = (dt.datetime(2024, month, 4, 0, 0), last_day(dt.datetime(2024, month, 4, 0, 0)))
-    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 6, 30, 23, 59))
+    timeframe = (dt.datetime(2023, 1, 1, 0, 0), dt.datetime(2023, 6, 30, 23, 59))
     index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
     Econs_m = [Econs[k] for k in index]
     Eprod_m = [Eprod[k] for k in index]
@@ -663,7 +675,7 @@ if __name__ == '__main__' :
     # for k in range(len(results_clus)) : 
     #     print(results_clus[k]['max_dif'])
         
-    days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 35, tol=1e-08, n_init=10, metric="dtw", norm=True)
+    days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 10, tol=1e-08, n_init=10, metric="dtw", norm=True)
 
 #%% Test cluster year        
 if __name__ == '__main__' : 

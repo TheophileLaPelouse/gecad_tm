@@ -157,25 +157,19 @@ class Individual(ctypes.Structure):
 
 lib.init_model.restype = ctypes.POINTER(Model)    
 
-from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2
+from prices import define_time, Econs, Eautocons, TEauto, tep, Kp, period_hours, full_date, define_time2, treat_data, increase_deltat
 import datetime as dt 
 import numpy as np
 
-TP = [0.066889, 0.040255, 0.031037, 0.025345, 0.004733, 0.002652]
-TE = [
-      [0.176631, 0.170670, 0, 0, 0, 0.125919], 
-      [0.126656, 0.131860, 0, 0, 0, 0.092685], 
-      [0, 0.126656, 0.131860, 0, 0, 0.073864], # March is not in the invoices so the figures are based on february
-      [0, 0, 0, 0.066662, 0.079025, 0.073864], 
-      [0, 0, 0, 0.079119, 0.094265, 0.097955], 
-      [0, 0, 0.124591, 0.143611, 0, 0.138129], 
-      [0.150950, 0.179345, 0, 0, 0, 0.148744], 
-      [0, 0, 0.165865, 0.181045, 0, 0.169511], 
-      [0, 0, 0.145440, 0.167703, 0, 0.150691], 
-      [0, 0, 0, 0.137424, 0.169721, 0.133218], 
-      [0, 0.195679, 0.210640, 0, 0, 0.172424]
-      ]
+from prices_tubacer import TE, TP 
+from prices_porto_motor import TE_pm_2024, TP_pm_2024
 
+TE, TP = TE_pm_2024, TP_pm_2024
+pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
+Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
+                                                 format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+deltat = deltat[0]
+Eprod, Econs, full_date, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat)
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 4, 0, 59))
 timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 10, 23, 59))
 # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 10, 23, 59))
@@ -197,7 +191,7 @@ indexPprev = [indexCb+1, indexCb+1+len(Pprev)]
 opti_bounds = [[0, 0] for k in range(Var_size)]
 for k in range(*indexPb) : 
     opti_bounds[k] = [-1, 1]
-opti_bounds[indexCb] = [68, 1000]
+opti_bounds[indexCb] = [10, 1000]
 # opti_bounds[indexCb] = [0, 0]
 for k in range(*indexPprev) : 
     opti_bounds[k] = [0, 500]
