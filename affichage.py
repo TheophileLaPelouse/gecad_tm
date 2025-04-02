@@ -13,6 +13,7 @@ from representative_days import separate_days
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
 import matplotlib.pyplot as plt
 import datetime as dt
+import numpy as np
 
 
 #%% utility function
@@ -36,20 +37,118 @@ def recov_time(obj0, res, bat_price, Cb) :
     -------
     float
         Recovery time.
-
     """
     cash_flow = obj0 - res
     invest = bat_price*Cb 
+    print(obj0, res, bat_price, Cb)
     return (invest/cash_flow)
     
-def ploat_recov_vs_price() : 
+def plot_recov_vs_price(Res) : 
+    Cb_prices = [val for val in Res]
+    sorted(Cb_prices)
+    print(Cb_prices)
+    ress = [Res[val]['res'] for val in Cb_prices]
+    Cbs = [Res[val]['Cb'] for val in Cb_prices]
+    objs = [Res[val]['obj'] for val in Cb_prices]
+    if Cbs[-1] > 0.1 : 
+        print("Nope we need a 0 reference for the battery")
+        return
+    recov_times = [recov_time(objs[-1], ress[k], int(float(Cb_prices[k])), Cbs[k]) for k in range(len(Cb_prices))]
+    to_plot = [[], []]
+    Cb = Cbs[0]
+    k = 0
+    while Cb > 1 : 
+        to_plot[0].append(int(float(Cb_prices[k])))
+        to_plot[1].append(recov_times[k])
+        k += 1
+        Cb = Cbs[k]
+    fig, ax = plt.subplots()
+    ax.plot(to_plot[0], to_plot[1])
+    ax.set_xlabel('Battery price (€)')
+    ax.set_ylabel('Recovery time (years)')
+    ax.set_title('Recovery time depending on the battery price')
+    plt.show()
+    return fig
+    
+def plot_Cb_vs_price(Res, markersize=30) : 
+    Cb_prices = [val for val in Res]
+    sorted(Cb_prices)
+    print(Cb_prices)
+    ress = [Res[val]['res'] for val in Cb_prices]
+    Cbs = [Res[val]['Cb'] for val in Cb_prices]
+    objs = [Res[val]['obj'] for val in Cb_prices]
+    Cb_prices = [int(float(val)) for val in Cb_prices]
+    fig, ax = plt.subplots()
+    ax.plot(Cb_prices, Cbs, '+', markersize=markersize)
+    ax.set_xlabel('Battery price (€)')
+    ax.set_ylabel('Battery capacity (kWh)')
+    # ax.set_title('Battery capacity depending on the battery price')
+    plt.show()
+    return fig
+    
+def plot_obj_vs_price(Res) : 
+    Cb_prices = [val for val in Res]
+    sorted(Cb_prices)
+    print(Cb_prices)
+    ress = [Res[val]['res'] for val in Cb_prices]
+    Cbs = [Res[val]['Cb'] for val in Cb_prices]
+    objs = [Res[val]['obj'] for val in Cb_prices]
+    Cb_prices = [int(float(val)) for val in Cb_prices]
+    fig, ax = plt.subplots()
+    ax.plot(Cb_prices, objs)
+    ax.set_xlabel('Battery price')
+    ax.set_ylabel('Objective value')
+    # ax.set_title('Objective value depending on the battery price')
+    plt.show()
+    return fig
+    
+def plot_decrease_vs_price(Res, markersize=20) : 
+    Cb_prices = [val for val in Res]
+    sorted(Cb_prices)
+    print(Cb_prices)
+    ress = [Res[val]['res'] for val in Cb_prices]
+    Cbs = [Res[val]['Cb'] for val in Cb_prices]
+    objs = [Res[val]['obj'] for val in Cb_prices]
+    Cb_prices = [int(float(val)) for val in Cb_prices]
+    if Cbs[-1] > 0.1 : 
+        print("Nope we need a 0 reference for the battery")
+        return
+    dcrs = [(objs[-1]-obj)/objs[-1]*100 for obj in objs]
+    fig, ax = plt.subplots()
+    ax.plot(Cb_prices, dcrs, '+', markersize=markersize)
+    list_annote = [0, 5, 10, 18]
+    for k in range(len(Cbs)) :
+        if k in list_annote:
+            x, y = Cb_prices[k], dcrs[k] 
+            print(x, y)
+            ax.annotate(f'$Cb = {round(Cbs[k], 2)}$', xy=(x,y))
+    ax.set_xlabel('Battery installation price (€/kWh)')
+    ax.set_ylabel('Decrease of annual cost (%)')
+    # ax.set_title('Objective value depending on the battery price')
+    plt.show()
+    return fig
+
+def pena_charge_and_discharge(Pc, Pd, time=None, coef=1) : 
+    if coef == 'tot' : 
+        return 0
+    if Pd is None :
+        return coef*sum(p for p in Pc)
+    else : 
+        if time is None :
+            return coef*sum(Pc[t]*Pd[t] for t in range(len(Pc)))
+        else : 
+            return coef*sum(Pc[t]*Pd[t] for t in time)
+    
 #%%
 
 path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price_Tub.json')
 with open(path_results_bat_price) as f: 
     Res = json.load(f)
     
-    
+path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price.json')
+with open(path_results_bat_price) as f: 
+    Res_pm = json.load(f)
+
 Cb_prices = [val for val in Res]
 sorted(Cb_prices)
 objs = [Res[val]['obj'] for val in Cb_prices]
@@ -65,6 +164,12 @@ for k in range(1) :
     for t in range(len(Pc[:100])) : 
         print('t, Ebat[-1], Ebat[+1], Pc, Pd', t, Ebat[k][-1], Ebat[k][-1] + (0.95*Pc[t] - Pd[t]/0.95)*4, Pc[t], Pd[t])
         Ebat[k].append(Ebat[k][-1] + (0.95*Pc[t] - Pd[t]/0.95)*4)
+
+ratios = []
+for k in range(len(Cbs)) : 
+    pena = pena_charge_and_discharge(Pcs[k], Pds[k])
+    ratio = pena/objs[k]
+    ratios.append(ratio)
 
 #%% 
 
@@ -114,5 +219,36 @@ ax.plot(t, [0.2*Cbs[0] for val in t], '--', color="black")
 ax.plot(t, [Cbs[0] for val in t], '--', color="black")
 ax.legend()
 
-#%% Recovery time depending on the price 
+#%% plot time results
+
+path_time = 'Results/csv/time.json'
+with open(path_time) as f : 
+    time_results = json.load(f)
+n = len(time_results)
+deltas = [1+k*0.5 for k in range(n)]
+
+# On vérifie si on a une tendance polynomiale
+p = np.polyfit(range(n), time_results, 2)
+f = lambda x : p[0]*x**2 + p[1]*x + p[2]
+
+fig, ax = plt.subplots()
+ax.plot(deltas, time_results, '+', label="Model optimization time results", markersize=15)
+plt.plot(deltas, [f(k) for k in range(n)], '--',linewidth=3 ,label=f"$y={round(p[0], 2)}x^2 + {round(p[1], 2)}x + {round(p[0], 2)}$")
+ax.set_xlabel("Number of days")
+ax.set_ylabel("Time taken to solve (seconds)")
+ax.legend()
+
+#%% (example that does not work for now bug so not the right values)
+
+path_250_tub = 'Results/csv/250_tub.json'
+with open(path_250_tub) as f : 
+    d = json.load(f)
+Cbs_bis = [val for val in d]
+sorted(Cbs_bis)
+plt.rcParams['font.size'] = 25
+fig, ax = plt.subplots()
+ax.plot(Cbs_bis, [d[Cb] for Cb in Cbs_bis], '+', markersize=30)
+ax.plot(Res['250']['Cb'], Res['250']['obj'], '.')
+ax.set_xlabel('Battery size (kwh)')
+ax.set_ylabel('Optimal objective function value')
 
