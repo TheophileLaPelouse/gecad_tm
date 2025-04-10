@@ -36,44 +36,54 @@ months = range(1, 12) # No december for the moment
 # Warning, maybe we should add some representative days specifically in the none working days.
 
 def create_index(day, full_date, delta = dt.timedelta(hours = 23, minutes = 59)) : 
+    """
+    Create a list of index for the day, 
+    where full_date[index[0]] is the first index of the day in full_date.
+    """
     return range(search_dico(full_date, day, 'fin'), search_dico(full_date, day + delta, 'debut')+1)
 
 def select_days(month, TE, Econs, Eprod, period_hours, full_date, deltat = dt.timedelta(minutes=15), during_day_stat = None) : 
+    """
+    Select days based on the production-to-consumption ratio. But this version is not used
+    """
     if month != 11 : 
         timeframe = (dt.datetime(2024, month, 1, 0, 0), last_day(dt.datetime(2024, month, 1, 0, 0)))
     else :
         timeframe = (dt.datetime(2024, month, 1, 0, 0), dt.datetime(2024, month, 21, 23, 59))
+        # Tubacer specific (the method was not working correctly for PM)
+    
     # Time, Nbdays, Time_in_month = define_time(timeframe, period_hours)
-    d = timeframe[0]
+    d = timeframe[0] # First day of the month
     
     mediane_day = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'sum_Econs_Eprod' : 0, 'day' : None}
     max_day = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'sum_Econs_Eprod' : 0, 'day' : None}
     min_day = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'sum_Econs_Eprod' : 1000000000, 'day' : None}
     Econs_month = []
     Eprod_month = []
-    Ecp_month = []
+    Ecp_month = [] # Sum of Econs and Eprod
     days = []
     while d < timeframe[1] : 
         index = create_index(d, full_date)
-        sum_Econs = sum([Econs[k] for k in index]) # I verified, it is really faster with the brackets
+        sum_Econs = sum([Econs[k] for k in index]) # I verified, the sum is really faster with the brackets
         sum_Eprod = sum([Eprod[k] for k in index])
         sum_Econs_Eprod = sum_Econs - sum_Eprod
         
-        during_day_stat_values = {}
+        during_day_stat_values = {} # This was in case me make more complex heuristic
         
-        k = search_dico(Ecp_month, sum_Econs_Eprod, 'fin')
+        k = search_dico(Ecp_month, sum_Econs_Eprod, 'fin') # Sort days in increasing order of Econs-Eprod
         if days :
             Ecp_month = Ecp_month[:k] + [sum_Econs_Eprod] + Ecp_month[k:]
             days = days[:k] + [d] + days[k:]
             Econs_month = Econs_month[:k] + [sum_Econs] + Econs_month[k:]
             Eprod_month = Eprod_month[:k] + [sum_Eprod] + Eprod_month[k:]
             
-        else :
+        else : # if days == []
             days.append(d)
             Econs_month.append(sum_Econs)
             Eprod_month.append(sum_Eprod)
             Ecp_month.append(sum_Econs_Eprod)
         
+        # Search max and min days regarding this sum (not used in the end)
         if sum_Econs_Eprod > max_day['sum_Econs_Eprod'] : 
             max_day['sum_Econs'] = sum_Econs
             max_day['sum_Eprod'] = sum_Eprod
@@ -88,11 +98,12 @@ def select_days(month, TE, Econs, Eprod, period_hours, full_date, deltat = dt.ti
             
         if during_day_stat is not None : 
             for k in index :
+                # Does nothing for the moment
                 during_day_stat_values = during_day_stat(k, month, TE, Econs, Eprod, period_hours, full_date, deltat, during_day_stat_values)
                 
         d += dt.timedelta(days=1)
         
-    med = len(Ecp_month)//2
+    med = len(Ecp_month)//2 # The list is sorted so taking the value in the middle gives the mediane
     index = create_index(days[med], full_date)
     print(mediane_day)
     mediane_day['sum_Econs'] = Econs_month[med]
@@ -115,8 +126,17 @@ def select_days(month, TE, Econs, Eprod, period_hours, full_date, deltat = dt.ti
 # Same function but now list of condition to build several representative days 
 
 def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond, list_frac, deltat = dt.timedelta(minutes=15), during_day_stat = None) :
+    """
+    Select days based on the production-to-consumption ratio.
+    It works with a list of conditions and a list of fractions 
+    in order to have a lot of flexibility in the first tests.
+    
+    The day are selected based on the conditions given regarding the production-to-consumption ratio.
+    And also based on the fraction, which correspond to the quantiles.
+    """
+    
     # Conditions should be written as such "sum_Econs > name_of_the_value"
-    Days = {}
+    Days = {} # selected days
     for cond in list_of_cond :
         args = cond.split(' ')
         # check if the condition is well written
@@ -133,7 +153,7 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
             Days[args[2]] = {'Econs' : [], 'Eprod' : [], 'sum_Econs' : 0, 'sum_Eprod' : 0, 'sum_Econs_Eprod' : 0, 'frac' : 1, 'day' : None, 'cond' : cond}
             if args[1] in ['<', '<='] : 
                 Days[args[2]]['sum_Econs_Eprod'] = 1000000000 # We can add some zero if needed
-                Days[args[2]]['sum_Econs'] = 1000000000
+                Days[args[2]]['sum_Econs'] = 1000000000 
                 Days[args[2]]['sum_Eprod'] = 1000000000
     
     for frac in list_frac : 
@@ -153,9 +173,10 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
     Efrac_month = []
     days = []
 
+    # Here works the same as the previous function
     while d < timeframe[1] : 
         index = create_index(d, full_date)
-        sum_Econs = sum([Econs[k] for k in index]) # I verified, it is really faster with the brackets
+        sum_Econs = sum([Econs[k] for k in index]) 
         sum_Eprod = sum([Eprod[k] for k in index])
         sum_Econs_Eprod = sum_Econs - sum_Eprod
         
@@ -216,6 +237,11 @@ def select_days2(month, TE, Econs, Eprod, period_hours, full_date, list_of_cond,
     return Days, during_day_stat_values
     
 def separate_days(Econs, Eprod, full_date, TE = TE, period_hours=period_hours, delta=dt.timedelta(hours=23, minutes=59), bat=None) : 
+    """
+    Separate year list by day and put all the possibly needed information in the dictionary.
+    Return a list of dictionaries, one for each day. 
+    """
+    
     if TE is not None : 
         if period_hours is None : 
             raise ValueError('Faut avoir des périodes pour les prix par contre')
@@ -275,6 +301,12 @@ def calculate_ratio(k_day, Days) :
     return sum_Eprod/sum_Econs
     
 def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10) : 
+    """
+    Create clusters of the days in the year based on the sum of energy produced and consumed.
+    It uses the KMeans algorithm from tslearn. 
+    """
+    
+    
     # For running test
     ts_Etot = [Days[k]['Etot'] for k in range(len(Days))]
     
@@ -285,8 +317,10 @@ def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n
     #         ts[k, i, 0] = ts_val[k]['Econs'][i]
     #         ts[k, i, 1] = ts_val[k]['Eprod'][i]
     
-    formatted = to_time_series_dataset(ts_Etot)
+    formatted = to_time_series_dataset(ts_Etot) # Format data for tslearn
     # formatted=to_time_series_dataset(ts)
+    
+    # TimeSeriesKMeans is the KMeans model for time series
     km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
     # km = KernelKMeans(n_clusters=nb_cluster, max_iter=max_iter, tol=tol, n_init=n_init)
     # km = KShape(n_clusters=nb_cluster, max_iter=max_iter, tol=tol, n_init=n_init)
@@ -306,6 +340,7 @@ def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n
         bar = dtw_barycenter_averaging(formatted_in_cluster)
         Etotmax = max([max(abs(formatted[day])) for day in days])
         for day in days :
+            # Gives several information about each day to be able to select them in various ways
             result['ratios'].append(calculate_ratio(day, Days))
             result['dtws'].append(dtw(bar[:, 0], Days[day]['Etot']))
             result['dtws_norm'].append(dtw(bar/Etotmax, formatted[day]/Etotmax))
@@ -323,6 +358,11 @@ def create_clusters(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n
     return days_by_clusters, results, silhouette, km
 
 def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10, no_plot=False, norm=False) : 
+    """
+    Create clusters of the days in the year based on 2 dimension, the energy produced and the consumed one.
+    It uses the KMeans algorithm from tslearn. 
+    """
+    
     # For running test    
     ts = np.zeros((len(Days), len(Days[0]['date']), 2))
     to_rm = []
@@ -334,10 +374,10 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
                     ts[k, i, 0] = Days[k]['Econs'][i]
                     ts[k, i, 1] = Days[k]['Eprod'][i]
                 except IndexError : 
-                    to_rm.append(k)
+                    to_rm.append(k) # Because of several reasons, we can have some index error, in those case, we simply remove the day (change of hour for example)
             else : 
                 try : 
-                    ts[k, i, 0] = Days[k]['Econs_norm'][i]
+                    ts[k, i, 0] = Days[k]['Econs_norm'][i] # If normalized data
                     ts[k, i, 1] = Days[k]['Eprod_norm'][i]
                 except IndexError : 
                     to_rm.append(k)
@@ -355,7 +395,7 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
         days_by_clusters[clusters[k]].append(k)
         
     results = [{'ratios' : []} for k in range(nb_cluster)]
-    if not no_plot :
+    if not no_plot : # Plot results 
         c = 0
         for days in days_by_clusters : 
             fig1, ax1 = plt.subplots()
@@ -381,9 +421,15 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
     return days_by_clusters, results, silhouette_mean, km
 
 def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_iter = 100, tol=1e-06, n_init = 5, wanted=50) : 
+    """
+    Function with different methods to generate typical days based on the method in the functions seen above 
+    """
+    
     # For the optimization
     
     if method == 'max' :
+        # Method where we take the day with the maximum energy produced + energy consumed in each cluster
+        # Particularly useful for taking into account penalization cost
         ts_Etot = [Days[k]['Etot'] for k in range(len(Days))]
         formatted = to_time_series_dataset(ts_Etot)
         km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
@@ -400,6 +446,7 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
         return days_result
     
     elif method == 'barycenter' : 
+        # Method where we take the barycenter of each cluster as the representative day
         # We need to take the 2D version of the data
         ts = np.zeros((len(Days), len(Days[0]['date']), 2))
         to_rm = []
@@ -431,6 +478,8 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
         return new_Econs, new_Eprod, number_of_representative
     
     elif method=="random" : 
+        # This method was supposed to be smart, but it fact it is equivalent to taking random days
+        # And it is not the most efficient at it... 
         ts = np.zeros((len(Days), len(Days[0]['date']), 2))
         to_rm = []
         for k in range(len(Days)) : 
@@ -461,12 +510,16 @@ def generate_typical_kmean(Days, nb_cluster, method='max', metric="dtw", max_ite
         
 
 def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, Eprod=Eprod, TE=TE, period_hours=period_hours, full_date=full_date, forced_timeframe=None, nb_days=5, wanted=50) : 
+    """ 
+    This function uses the function seen above usable data for the optimization based on the different methods.
+    """
     Econs_new = []
     Eprod_new = []
     full_date_new = []
     days = []
     nb_repr = []
     if method == "complete_random" : 
+        # Method to verify if what I did was useful
         if forced_timeframe is None : 
             timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 31, 0, 0))
         else : timeframe = forced_timeframe
@@ -484,6 +537,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
             days.append(cluster_Days[day]['date'][0].date())
         
     if method == "year" : 
+        # Method using the random method seen in the function above, so not really good
         if forced_timeframe is None : 
             timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 31, 0, 0))
         else : timeframe = forced_timeframe
@@ -501,6 +555,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
             full_date_new += cluster_Days[day]['date']
             days.append(cluster_Days[day]['date'][0].date())
     if method=="year_barycenter" : 
+        # Method using the barycenter of the clusters, and search the cluster for the whole year
         if forced_timeframe is None : 
             timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 10, 31, 0, 0))
         else : timeframe = forced_timeframe
@@ -521,6 +576,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
             days.append(cluster_Days[random_day[k]]['date'][0].date())
     for m in months :
         if method == "quantile" :
+            # Method using the quantile of the production to consumption ratio
             Days, _ = select_days2(m, TE, Econs, Eprod, period_hours, full_date, [], [0.05, 0.25, 0.5, 0.75, 0.95])
             for key in Days :
                 Econs_new += Days[key]['Econs']
@@ -528,6 +584,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
                 full_date_new += [full_date[k] for k in create_index(Days[key]['day'], full_date)[:-1]]
                 days.append(Days[key]['day']) # For verification sake
         elif method == "kmean_max" : 
+            # Method using the max method seen above by month 
             if forced_timeframe is None : 
                 timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
             else : timeframe = forced_timeframe
@@ -543,6 +600,7 @@ def create_data(method="quantile", months=range(1, 10), n_init=1, Econs=Econs, E
                 full_date_new += cluster_Days[day]['date']
                 days.append(cluster_Days[day]['date'][0].date())
         elif method == "kmean_barycenter" :
+            # Method using the barycenter of the clusters, and search the cluster for the months
             if forced_timeframe is None : 
                 timeframe = (dt.datetime(2024, m, 4, 0, 0), last_day(dt.datetime(2024, m, 4, 0, 0)))
             else : timeframe = forced_timeframe

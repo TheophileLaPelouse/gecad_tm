@@ -439,8 +439,33 @@ for i in range(len(companies)):
 # Adjust layout
 plt.tight_layout()
 plt.show()
-                                    
-        
+                  
+#%%
+fig2, axs2 = plt.subplots(2, 1)
+selected_companies = ['Tubacer 2024', 'Porto Motor 2024']
+for i, comp in enumerate(selected_companies):
+    ax = axs2[i]
+    words = comp.split()
+    comp = ' '.join(words[:-1])
+    year = words[-1]
+    mean_Econs = Values[comp][year]['mean_Econs']
+    mean_Eprod = Values[comp][year]['mean_Eprod']
+    t = list(range(len(mean_Econs)))
+    t = [val * 24 / len(mean_Econs) for val in t]
+    mean_Econs = [val / (24 / len(mean_Econs)) for val in mean_Econs]
+    mean_Eprod = [val / (24 / len(mean_Eprod)) for val in mean_Eprod]
+    ax.plot(t, mean_Econs, label='Mean Consumption')
+    if any(mean_Eprod): 
+        ax.plot(t, mean_Eprod, label='Mean Production')
+    ax.set_title(Alias.get(comp + ' ' + year, comp + ' ' + year))
+    ax.set_xlabel('Hour of the day')
+    ax.set_ylabel('Power (kW)')
+    ax.legend()
+
+# Adjust layout for the second figure
+plt.tight_layout()
+plt.show()
+                  
 
 
             

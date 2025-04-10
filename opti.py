@@ -452,7 +452,7 @@ def new_test(wanted=50, path="Results/csv/best_repr_div.csv", Econs=Econs, Eprod
 #%% Simple solve over the year 
 
 if __name__ == '__main__' :
-    timeframe = (dt.datetime(2023, 1, 1, 0, 0), dt.datetime(2023, 11, 10, 23, 59))
+    timeframe = (dt.datetime(2024, 1, 1, 0, 0), dt.datetime(2024, 11, 1, 23, 59))
     # timeframe = (dt.datetime(2024, 4, 1, 0, 0), dt.datetime(2024, 4, 1, 0, 59))
     # model_year, Time_in_month, Nbdays_year = build_model(full_time, definer=2, TE=TE_pm_2024, TP=TP_pm_2024)
     model_year, Time_in_month, Nbdays_year = build_model(timeframe, full_date=full_date, Econs=Econs, Eautocons=Eautocons, deltat=deltat, TE=TE_pm_2024, TP=TP_pm_2024)

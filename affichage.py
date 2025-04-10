@@ -63,14 +63,22 @@ def plot_recov_vs_price(Res) :
         k += 1
         Cb = Cbs[k]
     fig, ax = plt.subplots()
-    ax.plot(to_plot[0], to_plot[1])
-    ax.set_xlabel('Battery price (€)')
+    ax.plot(to_plot[0], to_plot[1], '+', markersize=20)
+    list_annote = [0, 4, 8, 13]
+    for k in range(len(Cbs)) :
+        if k in list_annote:
+            x, y = to_plot[0][k], to_plot[1][k] 
+            print(x, y)
+            ax.annotate(f'$Cb = {round(Cbs[k], 2)}$', xy=(x,y))
+    ax.set_xlabel('Battery installation price (€/kWh)')
     ax.set_ylabel('Recovery time (years)')
-    ax.set_title('Recovery time depending on the battery price')
+    ax.set_xlim(140, 320)
+    # ax.set_title('Recovery time depending on the battery price')
+    fig.subplots_adjust(bottom=0.13)
     plt.show()
     return fig
     
-def plot_Cb_vs_price(Res, markersize=30) : 
+def plot_Cb_vs_price(Res, markersize=20) : 
     Cb_prices = [val for val in Res]
     sorted(Cb_prices)
     print(Cb_prices)
@@ -80,8 +88,9 @@ def plot_Cb_vs_price(Res, markersize=30) :
     Cb_prices = [int(float(val)) for val in Cb_prices]
     fig, ax = plt.subplots()
     ax.plot(Cb_prices, Cbs, '+', markersize=markersize)
-    ax.set_xlabel('Battery price (€)')
+    ax.set_xlabel('Battery installation price (€/kWh)')
     ax.set_ylabel('Battery capacity (kWh)')
+    fig.subplots_adjust(bottom=0.13)
     # ax.set_title('Battery capacity depending on the battery price')
     plt.show()
     return fig
@@ -124,6 +133,9 @@ def plot_decrease_vs_price(Res, markersize=20) :
             ax.annotate(f'$Cb = {round(Cbs[k], 2)}$', xy=(x,y))
     ax.set_xlabel('Battery installation price (€/kWh)')
     ax.set_ylabel('Decrease of annual cost (%)')
+    ax.set_xlim(130, 380)
+    ax.set_ylim(-0.3, 6.5)
+    fig.subplots_adjust(bottom=0.13)
     # ax.set_title('Objective value depending on the battery price')
     plt.show()
     return fig
@@ -145,7 +157,7 @@ path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv
 with open(path_results_bat_price) as f: 
     Res = json.load(f)
     
-path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price.json')
+path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price_pm.json')
 with open(path_results_bat_price) as f: 
     Res_pm = json.load(f)
 
@@ -252,3 +264,56 @@ ax.plot(Res['250']['Cb'], Res['250']['obj'], '.')
 ax.set_xlabel('Battery size (kwh)')
 ax.set_ylabel('Optimal objective function value')
 
+#%% proof that it works
+
+price_250 = '250'
+path_results_bat_proof_250 = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_diff_bat_pm.json')
+with open(path_results_bat_proof_250) as f: 
+    Res2_pm_250 = json.load(f)
+
+Cbs_250 = []
+for val in Res2_pm_250: 
+    if val != 'original': 
+        Cbs_250.append(val)
+
+Cbs_to_plot_250 = [float(val) for val in Cbs_250]
+
+# Load results for price = 150
+price_150 = '150'
+path_results_bat_proof_150 = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_diff_bat_pm_150.json')
+with open(path_results_bat_proof_150) as f: 
+    Res2_pm_150 = json.load(f)
+
+Cbs_150 = []
+for val in Res2_pm_150: 
+    if val != 'original': 
+        Cbs_150.append(val)
+
+Cbs_to_plot_150 = [float(val) for val in Cbs_150]
+
+font_size = 30
+marker_size = 20
+# Create the subplots
+
+fig, ax1 = plt.subplots()
+ax1.plot(Cbs_to_plot_250, [Res2_pm_250[cb] for cb in Cbs_250], '+', markersize=marker_size)
+ax1.plot(Res[price_250]['Cb'], Res[price_250]['obj'], 'o', label='Optimization result', markersize=marker_size)
+ax1.set_title('$InvestCost = 250€/kWh$', fontsize=font_size)
+ax1.set_xlabel('Battery size (kWh)', fontsize=font_size)
+ax1.set_ylabel('Objective function value', fontsize=font_size)
+ax1.legend(fontsize=font_size, loc='upper center')
+fig.subplots_adjust(bottom=0.13)
+# plt.tight_layout()
+plt.show()
+
+# Create the second figure for price = 150
+fig2, ax2 = plt.subplots()
+ax2.plot(Cbs_to_plot_150, [Res2_pm_150[cb] for cb in Cbs_150], 'x', markersize=marker_size)
+ax2.plot(Res[price_150]['Cb'], Res[price_150]['obj'], 'o', label='Optimization result', markersize=marker_size)
+ax2.set_title('$InvestCost = 150€/kWh$', fontsize=font_size)
+ax2.set_xlabel('Battery size (kWh)', fontsize=font_size)
+ax2.set_ylabel('Objective function value', fontsize=font_size)
+ax2.legend(fontsize=font_size, loc='upper center')
+fig2.subplots_adjust(bottom=0.13)
+# plt.tight_layout()
+plt.show()
