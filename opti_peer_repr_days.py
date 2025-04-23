@@ -21,7 +21,7 @@ from random import random
 import os
 
 from representative_days import separate_days
-from opti_peer_prosumers import Prosumers
+# from opti_peer_prosumers import Prosumers
 
 def create_clusters(Prosumers, full_date, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06, n_init = 10, no_plot=False, norm=False): 
     All_days = []
@@ -46,12 +46,12 @@ def create_clusters(Prosumers, full_date, nb_cluster, metric="dtw", max_iter = 1
     ts = np.delete(ts, to_rm, axis=0)
     ts = to_time_series_dataset(ts)
     km = TimeSeriesKMeans(n_clusters=nb_cluster, metric=metric, max_iter=max_iter, tol=tol, n_init=n_init)
-    clusters = km.fit_predict(formatted)
-    silhouette_mean = silhouette_score(formatted, clusters)
+    clusters = km.fit_predict(ts)
+    silhouette_mean = silhouette_score(ts, clusters)
     
     days_by_clusters = [[] for k in range(nb_cluster)]
     for k in range(len(clusters)) : 
         days_by_clusters[clusters[k]].append(k)
         
     # We can something to plot if needed here 
-    return days_by_clusters
+    return days_by_clusters, silhouette_mean

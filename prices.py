@@ -174,9 +174,13 @@ def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dad
             else : 
                 # print(str(df[date_col][k]) + ' ' + str(df[time_col][k]), format)
                 t = str(df[time_col][k])
+                flag_day = False
                 if t == '24' : 
                     t = '0'
+                    flag_day = True
                 full_date.append(dt.datetime.strptime(str(df[date_col][k]) + ' ' + t, format))
+                if flag_day : 
+                    full_date[-1] = full_date[-1] + dt.timedelta(days=1)
         print("OK3")
     deltat = (full_date[1] - full_date[0]).total_seconds()/3600
     for k in range(len(full_date)-1) : 
@@ -190,6 +194,9 @@ def treat_data(name="TUBACER", path=os.path.join(os.path.dirname(__file__), 'dad
     return Eautocons, Econs, full_date, deltat
 
 def increase_deltat(n, Eautocons, Econs, full_date, deltat) : 
+    """
+    Merge n time step together 
+    """
     full_date_new = [full_date[k] for k in range(0, len(full_date), n)]
     Econs_new = []
     Eautocons_new = []
@@ -197,6 +204,29 @@ def increase_deltat(n, Eautocons, Econs, full_date, deltat) :
         Econs_new.append(sum(Econs[k:k+n]))
         Eautocons_new.append(sum(Eautocons[k:k+n]))
     return Eautocons_new, Econs_new, full_date_new, deltat*n
+
+def reduce_deltat(n, Eautocons, Econs, full_date, deltat) : 
+    """
+    Divide a time step in n time steps, affecting the same values to each one 
+    """
+    full_date_new = []
+    Econs_new = []
+    Eautocons_new = []
+    for k in range(0, len(full_date)) : 
+        if k < len(full_date) - 1 :
+            deltat = (full_date[k+1] - full_date[k])/n
+            if (full_date[k+1] - full_date[k]) == dt.timedelta(hours=2) and full_date[k+1].hour==3 : 
+                # Change of hour 
+                deltat = dt.timedelta(hours=1)/n
+            # print('full_date for deltat', full_date[k+1], full_date[k])
+            # print('deltat, k', deltat, k)
+        for i in range(n) : 
+            Econs_new.append(Econs[k])
+            Eautocons_new.append(Econs[k])
+            # print('In the loop', full_date[k], deltat, i)
+            full_date_new.append(full_date[k] + deltat*i)
+            
+    return Eautocons_new, Econs_new, full_date_new, deltat/n
     
 #%%
 Eautocons, Econs, full_date, deltat = treat_data()
@@ -400,7 +430,7 @@ def define_time2(days, period_hours, tarif20=False) :
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
-    days.sort(key = lambda x : x.month)
+    days.sort(key = lambda x : x.year + x.month/10)
     n = len(days)
     c = 1
     previous_date = days[0].date()

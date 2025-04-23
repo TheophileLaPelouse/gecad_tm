@@ -157,7 +157,7 @@ path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv
 with open(path_results_bat_price) as f: 
     Res = json.load(f)
     
-path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price_pm.json')
+path_results_bat_price = os.path.join(os.path.dirname(__file__), 'Results', 'csv', 'results_bat_price_pm_selling.json')
 with open(path_results_bat_price) as f: 
     Res_pm = json.load(f)
 
@@ -245,7 +245,7 @@ f = lambda x : p[0]*x**2 + p[1]*x + p[2]
 
 fig, ax = plt.subplots()
 ax.plot(deltas, time_results, '+', label="Model optimization time results", markersize=15)
-plt.plot(deltas, [f(k) for k in range(n)], '--',linewidth=3 ,label=f"$y={round(p[0], 2)}x^2 + {round(p[1], 2)}x + {round(p[0], 2)}$")
+plt.plot(deltas, [f(k) for k in range(n)], '--',linewidth=3 ,label=f"$y={round(p[0]*4, 2)}x^2 + {round(p[1]*2, 2)}x + {round(p[0], 2)}$")
 ax.set_xlabel("Number of days")
 ax.set_ylabel("Time taken to solve (seconds)")
 ax.legend()

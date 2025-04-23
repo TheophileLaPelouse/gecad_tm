@@ -10,7 +10,7 @@ The goal here is to produce a container with for each prosumer the following dic
     load : equivalent to Econs before
     prod : equivalent to Eprod (or Eautocons) before
     dist : [dist1, dist2, ..., distn] the distances to the other prosumers for computing the loss
-    bat_parameters : [eff_ch, eff_dch, soc_min, soc_max, soc_init, rate_ch, rate_dch] the battery parameters
+    bat_parameters : [eff_ch, eff_dch, soc_min, soc_max, soc_init, rate_ch, rate_dch, last_val] the battery parameters
     (maybe) V : voltage
     (maybe) constraints : Other constraints defined in a str ?
     
@@ -24,13 +24,15 @@ Loss(dist1, dist2, power, (maybe) voltage) that computes the loss depending on t
 from prices_tubacer import TE, TE_new, TP, TP_new
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
 from prices_TMG import TE_TMG, TP_TMG
-from prices import treat_data, define_time, define_time2
+from prices import treat_data, define_time, define_time2, tep, Kp, increase_deltat, reduce_deltat
 from opti import build_model, calculate_price, period_hours
 import datetime as dt
 import calendar as cal
 from pyomo.opt import SolverFactory
 import os
 import pandas as pd
+
+#%%
 
 def compute_energy_price(TE, t, Time_ref) : 
     p, m = Time_ref[t]
@@ -39,7 +41,7 @@ def compute_energy_price(TE, t, Time_ref) :
 def compute_power_price(TP, p) : 
     return TP[p]
 
-def compute_penalization_price(period, month, tep, Kp, pgrid, pcont, Time_ref) : 
+def compute_penalization_price(period, month, tep, Kp, pgrid, pcont, Time_ref, timeframe) : 
     s = 0.0000000001
     Time, Nbdays, Time_in_month = define_time2(timeframe, period_hours)
     for t in range(len(Time_ref)) :
@@ -48,10 +50,10 @@ def compute_penalization_price(period, month, tep, Kp, pgrid, pcont, Time_ref) :
             s += (pgrid[t] - pcont[p]) ** 2
     return Kp[period]*tep*s**0.5
 
-def full_date_treatment(full_date, deltat) :
-    Time, Nbdays, Time_in_month = define_time2(full_date, deltat)
+def full_date_treatment(full_date, period_hours) :
+    Time, Nbdays, Time_in_month = define_time2(full_date, period_hours)
     Time_ref = [None for k in range(len(full_date))]
-    for p in Time_ref : 
+    for p in range(len(Time)) : 
         for t in Time[p] :
             m = 0 
             while t not in Time_in_month[m] : 
@@ -62,7 +64,7 @@ def full_date_treatment(full_date, deltat) :
         
 def make_dico_tub(nb_prosumers=4) :
     Eprod, Econs, full_date, deltat = treat_data(name="TUBACER")
-    Time_ref = full_date_treatment(full_date, deltat)
+    Time_ref = full_date_treatment(full_date, period_hours)
     dists = [0 for k in range(nb_prosumers-1)]
     bat_parameters = [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5]
     
@@ -73,6 +75,7 @@ def make_dico_tub(nb_prosumers=4) :
         "Time_ref" : Time_ref,
         "load" : Econs,
         "prod" : Eprod,
+        "full_date" : full_date,
         "dist" : dists,
         "bat_parameters" : bat_parameters,
     }
@@ -83,7 +86,10 @@ def make_dico_PM(nb_prosumers=4) :
     pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
     Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
-    Time_ref = full_date_treatment(full_time, deltat[0])
+    
+    Eprod, Econs, full_date, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat[0])
+
+    Time_ref = full_date_treatment(full_time, period_hours)
     
     dico = {
         "TE" : lambda t: compute_energy_price(TE_pm_2024, t, Time_ref),
@@ -92,8 +98,9 @@ def make_dico_PM(nb_prosumers=4) :
         "Time_ref" : Time_ref,
         "load" : Econs,
         "prod" : Eautocons,
+        "full_date" : full_date,
         "dist" : [0 for k in range(nb_prosumers-1)],
-        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5],
+        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5, 0.45],
     }
     return dico 
 
@@ -102,17 +109,19 @@ def make_dico_TMG(nb_prosumers=4) :
     Eautocons, Econs, full_time, deltat = treat_data(path=tmg_path, prod_col=-1, cons_col='Consumo kWh', 
                                                  date_col='Fecha', time_col='Hora', format="%d/%m/%Y %H", 
                                                  one_time_col=False, sheet_name=0)
-    deltat = deltat[0]
-    Time_ref = full_date_treatment(full_time, deltat)
+    Eprod, Econs, full_time, deltat = reduce_deltat(4, Eautocons, Econs, full_time, deltat[0])
+    
+    Time_ref = full_date_treatment(full_time, period_hours)
     dico = {
         "TE" : lambda t: compute_energy_price(TE_TMG, t, Time_ref),
         "TP" : lambda p: compute_power_price(TP_TMG, p),
         "TPena" : lambda period, month, pgrid, pcont: compute_penalization_price(period, month, tep, Kp, pgrid, pcont, Time_ref),
         "Time_ref" : Time_ref,
         "load" : Econs,
-        "prod" : Eautocons,
+        "prod" : Eprod,
+        "full_date" : full_time,
         "dist" : [0 for k in range(nb_prosumers-1)],
-        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5],
+        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5, 0.45],
     }
     
     return dico
@@ -123,7 +132,7 @@ def make_dico_Nar(nb_prosumers=4) :
                                                  date_col='Fecha', time_col='Hora', format="%d/%m/%Y %H", 
                                                  one_time_col=False, sheet_name=0)
     deltat = deltat[0]
-    Time_ref = full_date_treatment(full_time, deltat)
+    Time_ref = full_date_treatment(full_time, period_hours)
     dico = {
         "TE" : lambda t: compute_energy_price(TE_Nar, t, Time_ref),
         "TP" : lambda p: 0,
@@ -132,11 +141,11 @@ def make_dico_Nar(nb_prosumers=4) :
         "load" : Econs,
         "prod" : Eautocons,
         "dist" : [0 for k in range(nb_prosumers-1)],
-        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5],
+        "bat_parameters" : [0.95, 0.95, 0.2, 1, 0.5, 0.5, 0.5, 0.45],
     }
     
     
-    
+
 def make_dico() : 
     
     Prosumers = {
@@ -144,22 +153,53 @@ def make_dico() :
         "Porto_Motor" : make_dico_PM(),
         "TMG" : make_dico_TMG()
     }
-    n_min = None
-    for key in Prosumers : 
-        if n_min is None : 
-            n_min = len(Prosumers[key]["load"])
-        if len(Prosumers[key]["load"]) < n_min : 
-            n_min = len(Prosumers[key]["load"])
+    
+    # We want to have an exact correspondance for each date in the lists of each producer
+    index = {key : [] for key in Prosumers}
+    current_indice = {key : 0 for key in Prosumers}
+    full_date_sets = {key : set(Prosumers[key]['full_date']) for key in Prosumers}
+
+    full_date_gen = []
+    first_date = min([val for val in [Prosumers[key]['full_date'][0] for key in Prosumers]])
+    last_date = max([val for val in [Prosumers[key]['full_date'][-1] for key in Prosumers]])
+    deltat = dt.timedelta(minutes = 15)
+    
+    date = first_date
+    # We go through each possible dares and uses them if they are present for each consumers 
+    while date < last_date :
+        # print('date', date)
+        flag = True
+        for key in Prosumers : 
+            # print('key', key)
+            if not date in full_date_sets[key] : 
+                flag = False
+            else :     
+                for_print = current_indice[key]
+                while Prosumers[key]['full_date'][current_indice[key]] != date :
+                    # if current_indice[key] - for_print < 50 :
+                        # print('current_indice date', Prosumers[key]['full_date'][current_indice[key]])
+                    current_indice[key] += 1 
+                    # This should work because list in the right order with the same time interval
+                    # if not working it is a data problem
+        
+        if flag : 
+            for key in Prosumers : 
+                index[key].append(current_indice[key])
+            full_date_gen.append(date)
+        
+        date += dt.timedelta(minutes=15)
     
     for key in Prosumers :
-        Prosumers[key]["load"] = Prosumers[key]["load"][:n_min]
-        Prosumers[key]["prod"] = Prosumers[key]["prod"][:n_min]
-        Prosumers[key]["Time_ref"] = Prosumers[key]["Time_ref"][:n_min]
+        print(key)
+        Prosumers[key]["load"] = [Prosumers[key]["load"][i] for i in index[key]] 
+        Prosumers[key]["prod"] = [Prosumers[key]["prod"][i] for i in index[key]] 
+        Prosumers[key]["Time_ref"] = [Prosumers[key]["Time_ref"][i] for i in index[key]] # Should not be general because period can depend on the consumer
+        Prosumers[key]["full_date"] = full_date_gen
         
     return Prosumers
     
 #%%
-Prosumers = make_dico()    
+Prosumers = make_dico() 
 # What we need to verify is if the time for the values corresponds, mainly because of the change in hour.
 
     
