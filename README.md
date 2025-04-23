@@ -26,6 +26,8 @@ In the code, during Second and Third step there are a lot of tests being done.
 
 The first step is done using the function defined in `prices.py` and the other prices files, and there is also `representative_days.py` which completes it by providing method to create representative days data. The second step is done in all the code named `opti`, as well as in the C part. The third and Fourth steps are done in general in the same opti files but also in files with names beginning by `result`.
 
+The serie `opti_peer` is for the last and probably unfinished part of the work that includes peers.
+
 # First step
 
 ## prices.py
@@ -38,11 +40,19 @@ The other files with a name beginning by prices define the array for the prices 
 
 This file define a lot of function to select days using different methods. The first used one is select_days2 which uses the ratio production consumption. The other method are different variants using K mean clustering methods. The main function that will be used in other files is create_data
 
+## opti_peer_prosumers.py 
+
+This file aims to define a constructed dictionnary that will contains unified information for each prosumers in order to write the model easily.
+
+## opti_peer_repr_days.py
+
+Define the representative days function but for several prosumers at once, it is not inventing anything different form the representative_days.py file.
+
 # Second step
 
 ## Opti files 
 
-So opti.py is the simple optimisation to optimize only the P contracted values. opti_battery is the one that put a battery and try to find the optimal battery management. opti_h_bat is a file that optimize the P contracted values assuming a known behaviour of the battery usage. And finally metaheuristic_opti is a python implementation of some metaheuristic solvers.
+So opti.py is the simple optimisation to optimize only the P contracted values. opti_battery is the one that put a battery and try to find the optimal battery management. opti_h_bat is a file that optimize the P contracted values assuming a known behaviour of the battery usage. metaheuristic_opti is a python implementation of some metaheuristic solvers. And finally opti_peer_opti is the model with peers.
 
 On the opti file, we will first import the necessary ressources from the First step. Then define a function named build_model that take a lot of keyword arguments so that we can test all there is to test. This function build the optimisation model that will be used to solve the problems.
 
@@ -55,5 +65,7 @@ The C files are implementation of GA and PSO for our model. They can be run usin
 # Third and Fourth step
 
 Those two steps are in the tests in the opti files, representative_days.py and result files. They consist of calling the optimization function and then plot, save csv...
+
+For the optimization with battery, it is the file affichage.py that plot the saved results.
 
 
