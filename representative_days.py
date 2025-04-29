@@ -26,6 +26,7 @@ TE = [
       [0, 0, 0, 0.137424, 0.169721, 0.133218], 
       [0, 0.195679, 0.210640, 0, 0, 0.172424]
       ]
+# Maybe should be replaced using the prices files but not really important in this code.
 
 #%%
 
@@ -408,14 +409,17 @@ def create_clusters_2D(Days, nb_cluster, metric="dtw", max_iter = 100, tol=1e-06
                 result['ratios'].append(calculate_ratio(day, Days))
                 ax1.plot(range(len(Days[day]['Etot'])), Days[day]['Econs_norm'])
                 ax2.plot(range(len(Days[day]['Etot'])), Days[day]['Eprod_norm'])
-            ax1.plot(range(len(bar[:, 0])), bar[:, 0], linewidth=2, color='red', label='Cluster Barycenter')
-            ax1.set_title('cons %d    %s' % (c, str(days)))
-            ax2.plot(range(len(bar[:, 1])), bar[:, 1], linewidth=2, color='red', label='Cluster Barycenter')
-            ax2.set_title('prod %d    %s' % (c, str(days)))
+            ax1.plot(range(len(bar[:, 0])), bar[:, 0], linestyle='--', linewidth=2, color='red', label='Cluster Barycenter')
+            ax1.set_title('Consumption, cluster number %d, days %s' % (c, str(days)))
+            ax2.plot(range(len(bar[:, 1])), bar[:, 1], linestyle='--', linewidth=2, color='red', label='Cluster Barycenter')
+            ax2.set_title('Production, cluster number %d, days %s' % (c, str(days)))
             result['bar'] = bar
             result['plot'] = (fig1, ax1, fig2, ax2)
             c +=1
-        
+            ax1.legend()
+            ax1.grid()
+            ax2.grid()
+            ax2.legend()
         plt.show()
         
     return days_by_clusters, results, silhouette_mean, km
@@ -711,8 +715,8 @@ if __name__ == '__main__' :
 #%% Test cluster on one month
 if __name__ == '__main__' :
     month= 8
-    # timeframe = (dt.datetime(2024, month, 4, 0, 0), last_day(dt.datetime(2024, month, 4, 0, 0)))
-    timeframe = (dt.datetime(2023, 1, 1, 0, 0), dt.datetime(2023, 6, 30, 23, 59))
+    timeframe = (dt.datetime(2024, month, 1, 0, 0), last_day(dt.datetime(2024, month, 4, 0, 0)))
+    # timeframe = (dt.datetime(2023, 1, 1, 0, 0), dt.datetime(2023, 6, 30, 23, 59))
     index = create_index(timeframe[0], full_date, timeframe[1]-timeframe[0])[:-1]
     Econs_m = [Econs[k] for k in index]
     Eprod_m = [Eprod[k] for k in index]
@@ -733,7 +737,7 @@ if __name__ == '__main__' :
     # for k in range(len(results_clus)) : 
     #     print(results_clus[k]['max_dif'])
         
-    days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 10, tol=1e-08, n_init=10, metric="dtw", norm=True)
+    days_by_clusters, results_clus, silhouette, km = create_clusters_2D(cluster_Days, 5, tol=1e-08, n_init=10, metric="dtw", norm=True, no_plot=False)
 
 #%% Test cluster year        
 if __name__ == '__main__' : 

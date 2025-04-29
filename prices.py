@@ -355,6 +355,12 @@ def in_period(l, val) :
 timeframe = (dt.datetime(2024, 8, 31, 23, 59), dt.datetime(2024, 9, 30, 23, 59))
 
 def define_time(timeframe, period_hours, full_date = full_date, tarif20=False) : 
+    """
+    Define the table Time, Time_in_month and Nbdays
+    Time is a list of 6 lists, each list contains the index of the time step in the corresponding period
+    Time_in_month is a list of 12 sets, each set contains the index of the time step in the corresponding month
+    Nbdays is the number of days in the timeframe
+    """
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0
@@ -408,6 +414,10 @@ def last_day(any_day):
     return (next_month - dt.timedelta(days=next_month.day)).replace(hour=23, minute = 59)
 
 def search_dico(l, val, deb_or_fin = 'deb') : 
+    """
+    Search the index of the value in the list l using a binary search.
+    If the value is not in the list, return the index of the first value that is greater than or equal to val.
+    """
     deb = 0
     fin = len(l) - 1
     while fin - deb > 1 : 
@@ -426,7 +436,10 @@ def search_dico(l, val, deb_or_fin = 'deb') :
         return fin
     
     
-def define_time2(days, period_hours, tarif20=False) : 
+def define_time2(days, period_hours, tarif20=False) :
+    """
+    Do the same as define_time but can be used with days not necessarily ordered.
+    """ 
     Time = [[] for k in range(6)]
     Time_in_month = [set() for k in range(12)]
     P = 0

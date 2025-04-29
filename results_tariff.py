@@ -408,9 +408,9 @@ for key in Values :
         companies.append(key + ' 2024')
         
 pos = {'Tubacer 2024' : (0, 0), 'TMG 2024' : (0, 1), 'Porto Motor 2023' : (1, 0), 'Porto Motor 2024' : (1, 1)}
-# Alias = {'Tubacer 2024' : 'Alpha 2024', 'Porto Motor 2023' : 'Bravo 2023'
-         # , 'Porto Motor 2024' : 'Bravo 2024', 'TMG 2024' : 'Charlie 2024'}
-Alias = {}
+Alias = {'Tubacer 2024' : 'Alpha 2024', 'Porto Motor 2023' : 'Bravo 2023'
+         , 'Porto Motor 2024' : 'Bravo 2024', 'TMG 2024' : 'Charlie 2024'}
+# Alias = {}
 for i in range(len(companies)):
     comp = companies[i]
     print(i, i//2, i%2)
