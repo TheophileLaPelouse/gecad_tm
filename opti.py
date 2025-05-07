@@ -715,8 +715,8 @@ if __name__ == '__main__' :
     pm2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR', 'Porto Motor_2024.xlsx')
     Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+    Eautocons, Econs, full_time, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat[0])
     full_date = full_time
-    deltat = deltat[0]
     timerange = (full_time[0], dt.datetime(2024, 10, 31, 23, 59))
     
     model_year, Time_in_month, Nbdays_year = build_model(timerange, full_date=full_time, TE=TE_pm_2024, TP=TP_pm_2024, Econs=Econs, Eautocons=Eautocons, deltat=deltat)
@@ -730,7 +730,7 @@ if __name__ == '__main__' :
     import numpy as np
     opti = Pprev
     original = [35, 35, 35, 35, 35, 35]
-    not_so_much = [15, 15, 15, 15, 15, 15]
+    not_so_much = [12, 12, 12, 12, 12, 12]
     n = 15
     values = [list(np.linspace(original[p], opti[p], n//2)) for p in range(6)]
     values = [values[p] + list(np.linspace(opti[p], not_so_much[p], n//2)) for p in range(6)]
@@ -744,7 +744,7 @@ if __name__ == '__main__' :
         Pena_prices.append(pena() if not isinstance(pena, float) else pena)
         Power_prices.append(sp() if not isinstance(sp, float) else sp)
     
-    
+    #%%
     fig, ax = plt.subplots()
     ax.plot(Pena_prices, Power_prices, '+', markersize=20)
     ax.plot(Pena_prices[0], Power_prices[0], '+', color='orange', markersize=20)
@@ -755,9 +755,9 @@ if __name__ == '__main__' :
     tup = str(tuple(round(val) for val in original)).replace(' ', '')
     ax.annotate(f'Original contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[0]+Power_prices[0])} €', xy=(Pena_prices[0], Power_prices[0]), xytext=(Pena_prices[0]+100, Power_prices[0]))
     tup = str(tuple(round(val) for val in not_so_much)).replace(' ', '')
-    ax.annotate(f'Under-contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]-230, Power_prices[-1]+50))
+    ax.annotate(f'Under-contracted power : {tup}\nContracted power + penalization cost : {round(Pena_prices[-1]+Power_prices[-1])} €', xy=(Pena_prices[-1], Power_prices[-1]), xytext=(Pena_prices[-1]-200, Power_prices[-1]+50))
     ax.set_xlabel('Yearly penalization cost (€)')
     ax.set_ylabel('Yearly contracted power cost (€)')
     ax.set_xlim(-100, 2400)
-    ax.set_ylim(550, 1550)
+    ax.set_ylim(400, 1500)
     plt.show()

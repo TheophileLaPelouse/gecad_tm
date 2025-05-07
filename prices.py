@@ -221,12 +221,12 @@ def reduce_deltat(n, Eautocons, Econs, full_date, deltat) :
             # print('full_date for deltat', full_date[k+1], full_date[k])
             # print('deltat, k', deltat, k)
         for i in range(n) : 
-            Econs_new.append(Econs[k])
-            Eautocons_new.append(Econs[k])
+            Econs_new.append(Econs[k]/n)
+            Eautocons_new.append(Eautocons[k]/n)
             # print('In the loop', full_date[k], deltat, i)
             full_date_new.append(full_date[k] + deltat*i)
             
-    return Eautocons_new, Econs_new, full_date_new, deltat/n
+    return Eautocons_new, Econs_new, full_date_new, deltat.total_seconds()/60/60
     
 #%%
 Eautocons, Econs, full_date, deltat = treat_data()

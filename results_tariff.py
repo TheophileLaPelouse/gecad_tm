@@ -1,7 +1,7 @@
 from prices_tubacer import TE, TE_new, TP, TP_new
 from prices_porto_motor import TE_pm_2024, TP_pm_2024
 from prices_TMG import TE_TMG, TP_TMG
-from prices import treat_data, define_time, define_time2
+from prices import treat_data, define_time, define_time2, increase_deltat, reduce_deltat
 from opti import build_model, calculate_price, period_hours
 import datetime as dt
 import calendar as cal
@@ -56,13 +56,17 @@ pm2023_path = os.path.join(os.path.dirname(__file__), 'Datasets', '2_PORTOMOTOR'
 #%%
 Eautocons, Econs, full_time, deltat = treat_data(path=pm2024_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+Eautocons, Econs, full_time, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat[0])
+
 dico = Values['Porto Motor']['2024'] 
-dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat[0]
+dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat
 
 Eautocons, Econs, full_time, deltat = treat_data(path=pm2023_path, prod_col='Producción fotovoltaica', cons_col='Consumo', first_index=1,
                                                  format="%d.%m.%Y %H:%M", date_col="Fecha y hora", one_time_col=True, sheet_name=0, fac=1/1000)
+Eautocons, Econs, full_time, deltat = increase_deltat(3, Eautocons, Econs, full_time, deltat[0])
+
 dico = Values['Porto Motor']['2023']
-dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat[0]
+dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat
 
 #%%Narontec
 na2024_path = os.path.join(os.path.dirname(__file__), 'Datasets', '3_NARONTEC', 'Curvas_carga_Narontec_2024.xlsx')
@@ -73,13 +77,15 @@ dico = Values['Narontec']['2024']
 Eautocons, Econs, full_time, deltat = treat_data(path=na2024_path, prod_col=-1, cons_col='Consumo kWh', 
                                                  date_col='Fecha', time_col='Hora', format="%d/%m/%Y %H", 
                                                  one_time_col=False, sheet_name=0)
-dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat[0]
+Eautocons, Econs, full_time, deltat = reduce_deltat(4, Eautocons, Econs, full_time, deltat[0])
+dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat
 
 dico = Values['Narontec']['2023']
 Eautocons, Econs, full_time, deltat = treat_data(path=na2023_path, prod_col=-1, cons_col="PLANT CONSUMPTION", 
                                                  date_col='DATE', time_col='TIME', format="%d/%m/%Y 00:%H:%M", 
                                                  one_time_col=False, first_index=1, sheet_name=0, fac=1)
-dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat[0]
+Eautocons, Econs, full_time, deltat = reduce_deltat(4, Eautocons, Econs, full_time, deltat[0])
+dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat
 
 
 #TMG
@@ -88,7 +94,9 @@ dico = Values['TMG']['2024']
 Eautocons, Econs, full_time, deltat = treat_data(path=tmg_path, prod_col=-1, cons_col='Consumo kWh', 
                                                  date_col='Fecha', time_col='Hora', format="%d/%m/%Y %H", 
                                                  one_time_col=False, sheet_name=0)
-dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat[0]
+Eautocons, Econs, full_time, deltat = reduce_deltat(4, Eautocons, Econs, full_time, deltat[0])
+
+dico['Eautocons'], dico['Econs'], dico['full_time'], dico['deltat'] = Eautocons, Econs, full_time, deltat
 
 
 #Family 

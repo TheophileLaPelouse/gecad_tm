@@ -80,6 +80,7 @@ def make_dico_tub(nb_prosumers=4) :
     
     dico = {
         "TE" : compute_energy_price_tub,
+        
         "TP" : compute_power_price_tub,
         "TPena" : compute_penalization_price_tub,
         "Time_ref" : Time_ref,
