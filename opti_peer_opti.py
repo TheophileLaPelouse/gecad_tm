@@ -293,26 +293,30 @@ def build_model(Prosumers, **kwargs) :
 def solve(model, **kwargs) :
     # Function to solve the model using ipopt
     # The list of the options are described on the IPOPT documentation, almost all of them are useable using pyomo.
-    solver = SolverFactory('ipopt')
-    if kwargs.get('printation') :
-        solver.options['print_level'] = kwargs.get('print_level', 7)
-        solver.options['print_timing_statistics'] = 'yes'
-    solver.options['max_iter'] = kwargs.get('max_iter', 3000)
-    if kwargs.get('tol') : 
-        solver.options['tol'] = kwargs.get('tol')
+    solver = SolverFactory('gurobi')
+    # solver = SolverFactory('ipopt')
+    # if kwargs.get('printation') :
+    #     solver.options['print_level'] = kwargs.get('print_level', 7)
+    #     solver.options['print_timing_statistics'] = 'yes'
+    # solver.options['max_iter'] = kwargs.get('max_iter', 3000)
+    # if kwargs.get('tol') : 
+    #     solver.options['tol'] = kwargs.get('tol')
     # solver.options['acceptable_tol'] = 1e-6
-    solver.options['hsllib'] = '/usr/local/lib/libcoinhsl.dylib' # Depends on the installation
+    # solver.options['hsllib'] = '/usr/local/lib/libcoinhsl.dylib' # Depends on the installation
     # solver.options['nlp_scaling_method'] = 'none'
-    solver.options['linear_solver'] = 'ma97' # The most efficient for me
+    # solver.options['linear_solver'] = 'ma97' # The most efficient for me
+    import time 
+    t1 =  time.time()
     results = solver.solve(model, tee=kwargs.get('printation', True))
-    return solver, results
+    t2 = time.time()
+    return solver, results, t2-t1
 
 def create_sub_prosumers(Prosumers_tot, beg, end) : 
     sub_prosumer = []
     for key in Prosumers_tot : 
         sub_prosumer.append({})
         for k in Prosumers_tot[key] : 
-            if isinstance(Prosumers_tot[key][k], list) : 
+            if isinstance(Prosumers_tot[key][k], list) and k != 'bat_parameters': 
                 sub_prosumer[-1][k] = Prosumers_tot[key][k][beg:end]
             else : 
                 sub_prosumer[-1][k] = Prosumers_tot[key][k]
@@ -336,10 +340,10 @@ if __name__ == '__main__' :
             if callable(val) :
                 Prosumers_repr[k][key] = val
                 
-    Prosumers_1m = create_sub_prosumers(Prosumers_tot, 0, 96*60)
+    Prosumers_1m = create_sub_prosumers(Prosumers_tot, 96, 96*2)
     for k in range(len(index_prosumers)) : 
         Prosumers_1m[k]['bat_parameters'][4] = 0.5
-    kwargs = {'coef' : 0, 
+    kwargs = {'coef' : 1, 
               'bat_price' : 100, 
               # 'no_battery' : True, 
               # 'no_peer' : True
